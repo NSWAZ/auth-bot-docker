@@ -1,4 +1,4 @@
-const { Client, Events, GatewayIntentBits } = require('discord.js');
+const { Client, GatewayIntentBits, Events, AuditLogEvent } = require('discord.js');
 const { loadEnvironmentVariables } = require('./library/functions.js');
 
 loadEnvironmentVariables();
@@ -6,7 +6,7 @@ loadEnvironmentVariables();
 const seatUsersCache = new Map();
 
 // Create a new client instance
-const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers] });
+const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildModeration] });
 
 // 봇에 명령어 등록
 (async () => {
@@ -49,31 +49,27 @@ client.on(Events.InteractionCreate, async interaction => {
 	}
 });
 
-// FIXME : 봇이 수행한 명령어는 감시하지 않도록 수정 (반복적인 롤 추가/제거 방지)
-client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
-	if (oldMember.roles.cache.size == newMember.roles.cache.size) return;
+// TODO : 롤 감시 기능 이쪽으로 이동 + 롤 여러개 감시 가능하게 수정
+client.on(Events.GuildAuditLogEntryCreate, async auditLog => {
+	// 롤 업데이트가 아니거나 봇이 역할을 변경한 경우 무시
+	if (auditLog.action != AuditLogEvent.MemberRoleUpdate || auditLog.executorId === '1066230195473883136') return;
 
-	if (oldMember.roles.cache.size > newMember.roles.cache.size) {
-		// 롤 제거됨
-		const changedRoleIds = oldMember.roles.cache.filter(role => !newMember.roles.cache.has(role.id)).map(role => role.id);
-		const seatRoleApllier = new SeatRoleApllier(changedRoleIds, newMember.nickname);
-		seatRoleApllier.remove();
-	}
-	else if (oldMember.roles.cache.size < newMember.roles.cache.size) {
-		// 롤 추가됨
-		const changedRoleIds = newMember.roles.cache.filter(role => !oldMember.roles.cache.has(role.id)).map(role => role.id);
-		const seatRoleApllier = new SeatRoleApllier(changedRoleIds, newMember.nickname);
-		seatRoleApllier.add();
-	}
+	const user = await client.users.fetch(auditLog.targetId);
+	const member = await client.guilds.cache.get('337276039858356224').members.fetch(user.id);
+	const nickname = member.nickname;
+
+	const seatRoleApllier = new SeatRoleApllier(auditLog.changes[0].new[0].id, nickname);
+
+	if (auditLog.changes[0].key === '$add') {seatRoleApllier.add();}
+	else if (auditLog.changes[0].key === '$remove') {seatRoleApllier.remove();}
 });
 
-// TODO : 롤 여러개 감시 가능하게 수정
 class SeatRoleApllier {
-	constructor(changedRoleIds, discordNickname) {
+	constructor(changedRoleId, discordNickname) {
 		this.watchRoleId = '1210191232756621383';
 		this.roleId = '48';
 		this.seatReq = new (require('./library/seat-request.js'))();
-		this.changedRoleIds = changedRoleIds;
+		this.changedRoleId = changedRoleId;
 		this.discordNickname = discordNickname;
 	}
 
@@ -99,7 +95,7 @@ class SeatRoleApllier {
 	}
 
 	changedRoleIncludesWatchRole() {
-		return this.changedRoleIds.includes(this.watchRoleId);
+		return (this.changedRoleId === this.watchRoleId);
 	}
 
 	async add() {

@@ -1,12 +1,11 @@
 const { Client, GatewayIntentBits, Events, AuditLogEvent } = require('discord.js');
-const { loadEnvironmentVariables } = require('./library/functions.js');
+const { loadEnvironmentVariables, getAuditTargetNickname } = require('./library/functions.js');
 
 loadEnvironmentVariables();
 
 const seatUsersCache = new Map();
 
-// Create a new client instance
-const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildModeration] });
+const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildModeration, GatewayIntentBits.GuildMembers] });
 
 const commandsHandler = new (require('./library/commands-handler.js'))();
 const { commands } = commandsHandler.getCommands();
@@ -24,27 +23,23 @@ client.on(Events.InteractionCreate, async interaction => {
 	commandsHandler.executeCommands(interaction);
 });
 
-// TODO : 롤 감시 기능 이쪽으로 이동 + 롤 여러개 감시 가능하게 수정
-client.on(Events.GuildAuditLogEntryCreate, async auditLog => {
-	// 롤 업데이트가 아니거나 봇이 역할을 변경한 경우 무시
-	if (auditLog.action != AuditLogEvent.MemberRoleUpdate || auditLog.executorId === '1066230195473883136') return;
+// TODO : 롤 여러개 감시 가능하게 수정
+client.on(Events.GuildAuditLogEntryCreate, async (auditLog, guild) => {
+	const watchRoleId = '1210191232756621383';
 
-	const user = await client.users.fetch(auditLog.targetId);
-	const member = await client.guilds.cache.get('337276039858356224').members.fetch(user.id);
-	const nickname = member.nickname;
+	if (auditLog.action != AuditLogEvent.MemberRoleUpdate || auditLog.executorId === '1066230195473883136' || auditLog.changes[0].new[0].id != watchRoleId) return;
 
-	const seatRoleApllier = new SeatRoleApllier(auditLog.changes[0].new[0].id, nickname);
+	const nickname = await getAuditTargetNickname(auditLog, guild);
+	const seatRoleApllier = new SeatRoleApllier(nickname);
 
 	if (auditLog.changes[0].key === '$add') {seatRoleApllier.add();}
 	else if (auditLog.changes[0].key === '$remove') {seatRoleApllier.remove();}
 });
 
 class SeatRoleApllier {
-	constructor(changedRoleId, discordNickname) {
-		this.watchRoleId = '1210191232756621383';
+	constructor(discordNickname) {
 		this.roleId = '48';
 		this.seatReq = new (require('./library/seat-request.js'))();
-		this.changedRoleId = changedRoleId;
 		this.discordNickname = discordNickname;
 	}
 
@@ -69,20 +64,12 @@ class SeatRoleApllier {
 		}
 	}
 
-	changedRoleIncludesWatchRole() {
-		return (this.changedRoleId === this.watchRoleId);
-	}
-
 	async add() {
-		if (!this.changedRoleIncludesWatchRole()) return;
-
 		const seatUserId = await this.getSeatUserId();
 		await this.seatReq.userRoleAdd(seatUserId, this.roleId);
 	}
 
 	async remove() {
-		if (!this.changedRoleIncludesWatchRole()) return;
-
 		const seatUserId = await this.getSeatUserId();
 		await this.seatReq.userRoleRemove(seatUserId, this.roleId);
 	}

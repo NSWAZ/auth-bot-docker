@@ -8,45 +8,20 @@ const seatUsersCache = new Map();
 // Create a new client instance
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildModeration] });
 
-// 봇에 명령어 등록
-(async () => {
-	const handleCommands = require('./library/commands-handler.js');
-	const commends = await handleCommands('init');
-	client.commands = commends;
-})();
+const commandsHandler = new (require('./library/commands-handler.js'))();
+const { commands } = commandsHandler.getCommands();
+client.commands = commands;
 
-// Log in to Discord with your client's token
 client.login(process.env.DISCORD_TOKEN);
 
-// When the client is ready, run this code (only once)
-// We use 'c' for the event parameter to keep it separate from the already defined 'client'
 client.once(Events.ClientReady, c => {
 	console.log(`Ready! Logged in as ${c.user.tag}`);
 });
 
-// TODO : 이 부분 command-handler로 이동
 client.on(Events.InteractionCreate, async interaction => {
 	if (!interaction.isChatInputCommand()) return;
 
-	const command = interaction.client.commands.get(interaction.commandName);
-
-	if (!command) {
-		console.error(`No command matching ${interaction.commandName} was found.`);
-		return;
-	}
-
-	try {
-		await command.execute(interaction);
-	}
-	catch (error) {
-		console.error(error);
-		if (interaction.replied || interaction.deferred) {
-			await interaction.followUp({ content: 'There was an error while executing this command!', ephemeral: true });
-		}
-		else {
-			await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
-		}
-	}
+	commandsHandler.executeCommands(interaction);
 });
 
 // TODO : 롤 감시 기능 이쪽으로 이동 + 롤 여러개 감시 가능하게 수정

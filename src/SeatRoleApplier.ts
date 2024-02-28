@@ -33,7 +33,7 @@ export class SeatRoleApplier {
 			seatUserIndex++;
 		}
 
-		return user.main_character_id;
+		return user.id.toString();
 	}
 
 	/**

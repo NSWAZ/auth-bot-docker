@@ -1,5 +1,4 @@
 import { SeatRequester } from './library/handlers/SeatRequester';
-import { SeatUser } from './library/types';
 
 export class SeatRoleApplier {
 	private roleId: string;
@@ -53,4 +52,15 @@ export class SeatRoleApplier {
 		const seatUserId = await this.getSeatUserId(mainCharacterName);
 		await this.seatRequester.userRoleRemove(seatUserId, this.roleId);
 	}
+}
+
+interface SeatUser {
+    id: number,
+    name: string,
+    email: string,
+    active: boolean,
+    last_login: string,
+    last_login_source: string,
+    associated_character_ids: string[],
+    main_character_id: string,
 }

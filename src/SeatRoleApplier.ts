@@ -1,13 +1,9 @@
 import { SeatRequester } from './library/handlers/SeatRequester';
 
 export class SeatRoleApplier {
-	private roleId: string;
 	private seatRequester: SeatRequester = new SeatRequester();
 	private seatUsersCache = new Map<string, SeatUser>();
 
-	constructor() {
-		this.roleId = '48';
-	}
 
 	/**
 	 * mainCharacterName에 해당하는 seatUserId를 가져옵니다.
@@ -38,19 +34,21 @@ export class SeatRoleApplier {
 	/**
 	 * seatUserId에 해당하는 유저에게 뉴비 롤을 부여합니다.
 	 * @param {string} mainCharacterName
+	 * @param {string} roleId
 	 */
-	async add(mainCharacterName: string) {
+	async add(mainCharacterName: string, roleId: string) {
 		const seatUserId = await this.getSeatUserId(mainCharacterName);
-		await this.seatRequester.userRoleAdd(seatUserId, this.roleId);
+		await this.seatRequester.userRoleAdd(seatUserId, roleId);
 	}
 
 	/**
-	 * seatUserId에 해당하는 유저에게 뉴비 롤을 제거합니다.
+	 * seatUserId에 해당하는 유저에게 roleId에 해당하는 롤을 제거합니다.
 	 * @param {string} mainCharacterName
+	 * @param {string} roleId
 	 */
-	async remove(mainCharacterName: string) {
+	async remove(mainCharacterName: string, roleId: string) {
 		const seatUserId = await this.getSeatUserId(mainCharacterName);
-		await this.seatRequester.userRoleRemove(seatUserId, this.roleId);
+		await this.seatRequester.userRoleRemove(seatUserId, roleId);
 	}
 }
 

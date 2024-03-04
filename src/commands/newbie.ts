@@ -39,11 +39,11 @@ const NewbieCommand : SlashCommand = {
 		if (nickname === null) {throw new Error('nickname is null.');}
 
 		if (subcommand === 'add') {
-			void interaction.client.seatRoleApllier.add(nickname)
+			void interaction.client.seatRoleApllier.add(nickname, '48')
 				.then(() => interaction.editReply(`${user.toString()}님에게 뉴비 롤을 부여했습니다.`));
 		}
 		else if (subcommand === 'remove') {
-			void interaction.client.seatRoleApllier.remove(nickname)
+			void interaction.client.seatRoleApllier.remove(nickname, '48')
 				.then(() => interaction.editReply(`${user.toString()}님에게 뉴비 롤을 제거했습니다.`));
 		}
 	},

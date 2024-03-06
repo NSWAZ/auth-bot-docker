@@ -18,6 +18,9 @@ client.once(Events.ClientReady, async c => {
 	client.commands = await commandsHandler.getCommandsFromDir();
 	client.seatRoleApllier = new SeatRoleApplier();
 
+	log.info('Registered commands:');
+	log.info(client.commands);
+
 	if (!process.env.ANNOUNCEMENT_CHANNELS) throw new Error('ANNOUNCEMENT_CHANNELS is not defined in environment variables.');
 
 	const announcementChannels = JSON.parse(process.env.ANNOUNCEMENT_CHANNELS) as string[];

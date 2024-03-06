@@ -42,10 +42,15 @@ client.once(Events.ClientReady, async c => {
 		.setStyle(ButtonStyle.Primary)
 		.setLabel('콘스프 채팅');
 
+	const JoinWormhole = new ButtonBuilder()
+		.setStyle(ButtonStyle.Link)
+		.setLabel('웜홀 그룹')
+		.setURL('https://forums.nisuwaz.com/t/topic/947');
+
 	const message = 'Nisuwa Cartel에서는 원하는 활동에 따라 다양한 그룹을 운영하고 있습니다. 아래 버튼 중 하나를 클릭해서 SeAT 및 디스코드에서 그에 맞는 그룹에 들어가거나 신청 절차를 알아보실 수 있습니다.';
 
 	const row = new ActionRowBuilder<ButtonBuilder>()
-		.addComponents(joinCapSuperGroup, joinChoboFC, joinMoonMining, JoinCosuiChat);
+		.addComponents(joinCapSuperGroup, joinChoboFC, joinMoonMining, JoinCosuiChat, JoinWormhole);
 
 	const channelMsg: MessageCreateOptions = { content: message, components: [row] };
 

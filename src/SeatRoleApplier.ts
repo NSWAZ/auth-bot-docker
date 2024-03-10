@@ -15,9 +15,9 @@ export class SeatRoleApplier {
 		let seatUserIndex = 1;
 
 		while (user === undefined) {
-			const seatUsers = (await this.seatRequester.getSeatUsers(seatUserIndex)).data;
+			const seatUsers = await this.seatRequester.getUsers(seatUserIndex);
 
-			for (const seatUser of seatUsers) {
+			for (const seatUser of seatUsers.data) {
 				this.seatUsersCache.set(seatUser.name, seatUser);
 
 				if (seatUser.name === mainCharacterName) {
@@ -38,7 +38,7 @@ export class SeatRoleApplier {
 	 */
 	async add(mainCharacterName: string, roleId: string) {
 		const seatUserId = await this.getSeatUserId(mainCharacterName);
-		await this.seatRequester.userRoleAdd(seatUserId, roleId);
+		await this.seatRequester.addUserRole(seatUserId, roleId);
 	}
 
 	/**
@@ -48,7 +48,7 @@ export class SeatRoleApplier {
 	 */
 	async remove(mainCharacterName: string, roleId: string) {
 		const seatUserId = await this.getSeatUserId(mainCharacterName);
-		await this.seatRequester.userRoleRemove(seatUserId, roleId);
+		await this.seatRequester.removeUserRole(seatUserId, roleId);
 	}
 }
 

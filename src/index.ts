@@ -1,5 +1,5 @@
-import { Client, GatewayIntentBits, Events, AuditLogEvent, ChannelType, MessageCreateOptions, ButtonBuilder, ButtonStyle, ActionRowBuilder, GuildMember } from 'discord.js';
-import { getAuditTargetNickname, loadEnvironmentVariables, reflectNewbieRoleChange, sendAnnouncementMsg, setDefaultLogLevel } from './library/functions';
+import { Client, GatewayIntentBits, Events, AuditLogEvent, MessageCreateOptions, ButtonBuilder, ButtonStyle, ActionRowBuilder, GuildMember } from 'discord.js';
+import { getAuditTargetNickname, loadEnvironmentVariables, reflectNewbieRoleChange, sendAnnouncementMsgs, setDefaultLogLevel } from './library/functions';
 import { SeatRoleApplier } from './SeatRoleApplier';
 import { CommandsHandler } from './library/handlers/Commands';
 import log from 'loglevel';
@@ -17,13 +17,6 @@ client.once(Events.ClientReady, async c => {
 
 	client.commands = await commandsHandler.getCommandsFromDir();
 	client.seatRoleApllier = new SeatRoleApplier();
-
-	log.info('Registered commands:');
-	log.info(client.commands);
-
-	if (!process.env.ANNOUNCEMENT_CHANNELS) throw new Error('ANNOUNCEMENT_CHANNELS is not defined in environment variables.');
-
-	const announcementChannels = JSON.parse(process.env.ANNOUNCEMENT_CHANNELS) as string[];
 
 	const joinCapSuperGroup = new ButtonBuilder()
 		.setStyle(ButtonStyle.Link)
@@ -57,13 +50,7 @@ client.once(Events.ClientReady, async c => {
 
 	const channelMsg: MessageCreateOptions = { content: message, components: [row] };
 
-	for (const channelId of announcementChannels) {
-		const channel = await client.channels.fetch(channelId);
-
-		if (channel && channel.type === ChannelType.GuildText) {
-			void await sendAnnouncementMsg(channel, channelMsg);
-		}
-	}
+	void sendAnnouncementMsgs(client, channelMsg);
 });
 
 client.on(Events.InteractionCreate, interaction => {

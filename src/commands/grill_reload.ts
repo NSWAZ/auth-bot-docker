@@ -8,6 +8,7 @@ import {
   MessageComponentInteraction,
   TextChannel,
   VoiceChannel,
+  CategoryChannelResolvable,
 } from "discord.js";
 import { SlashCommand } from "../library/types";
 
@@ -39,9 +40,12 @@ const GrillReloadCommand: SlashCommand = {
           .setStyle(ButtonStyle.Danger),
       );
 
+    // need for type assertion
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
     const targetChannel = interaction.options.getChannel("targetchannel") as
       | TextChannel
-      | VoiceChannel;
+      | VoiceChannel
+      | null;
     if (targetChannel === null) throw Error("목표 채널을 찾을 수 없습니다.");
 
     const targetChannelName = `<#${targetChannel.id}> 채널`;
@@ -82,10 +86,6 @@ const GrillReloadCommand: SlashCommand = {
             case 1:
               void targetChannel
                 .clone()
-                .then(() => {
-                  console.log(targetCategories);
-                  // await targetChannel.setParent(targetCategories.values().next().id);
-                })
                 .then(async () => {
                   const today = new Date();
                   const year = today.getFullYear();
@@ -97,7 +97,10 @@ const GrillReloadCommand: SlashCommand = {
                   );
                 })
                 .then(async () => {
-                  await targetChannel.lockPermissions();
+                  await targetChannel.setParent(
+                    targetCategories.first()?.id as CategoryChannelResolvable,
+                    { lockPermissions: true },
+                  );
                 });
 
               break;

@@ -87,7 +87,7 @@ client.once(Events.ClientReady, (c) => {
 });
 
 client.on(Events.InteractionCreate, (interaction) => {
-  if (!interaction.isChatInputCommand()) return;
+  if (!interaction.isChatInputCommand() || !interaction.guild) return;
 
   commandsHandler.executeCommand(interaction).catch(console.error);
 });
@@ -123,7 +123,7 @@ client.on(Events.InteractionCreate, (interaction) => {
     ).size > 0
   ) {
     void client.seatRoleApplier.remove(
-      (interaction.member as GuildMember).nickname as string,
+      (interaction.member as GuildMember).nickname!,
       "49",
     );
     void interaction.reply({
@@ -135,7 +135,7 @@ client.on(Events.InteractionCreate, (interaction) => {
   }
 
   void client.seatRoleApplier.add(
-    (interaction.member as GuildMember).nickname as string,
+    (interaction.member as GuildMember).nickname!,
     "49",
   );
   void interaction.reply({

@@ -2,8 +2,20 @@ import { SlashCommandBuilder } from "discord.js";
 import { SlashCommand } from "../library/types";
 import { ZkillboardRequester } from "../library/handlers/ZkillboardRequester";
 import { EsiRequester } from "../library/handlers/EsiRequester";
+import { SeatRequester } from "../library/handlers/SeatRequester";
 import { getFormattedString } from "../library/functions";
 import srpPercentDB from "../static/srp_data.json";
+import { isAxiosError } from "axios";
+import { Pool, DatabaseError } from "pg";
+
+const databaseClient = new Pool({
+  host: process.env.POSTGRES_HOST,
+  user: process.env.POSTGRES_USER,
+  password: process.env.POSTGRES_PW,
+  database: process.env.POSTGRES_DB,
+  port: 5432,
+  max: 5,
+});
 
 const SRPRequestCommands: SlashCommand = {
   command: new SlashCommandBuilder()
@@ -81,7 +93,7 @@ const SRPRequestCommands: SlashCommand = {
             srpPercentDB.solo_rules[
               fieldName as keyof (typeof srpPercentDB)["solo_rules"]
             ];
-          srpPercent = srpObject.percentage as number;
+          srpPercent = srpObject.percentage;
 
           srpFinalValue = totalValue * srpPercent;
           if (srpFinalValue > srpObject.max_value) {
@@ -94,9 +106,70 @@ const SRPRequestCommands: SlashCommand = {
           );
           return;
       }
-      void interaction.editReply(
-        `${interaction.user.displayName}의 ${srpTypeString} SRP 신청: \n https://zkillboard.com/kill/${zkillboardKillmailData.killmail_id} \n ${getFormattedString(srpFinalValue, "number")} ISK (${getFormattedString(totalValue, "number")}ISK 의 ${getFormattedString(srpPercent, "percent")}%)`,
-      );
+
+      try {
+        const seatRequester = new SeatRequester();
+        const seatCharacterData = await seatRequester.getCharacterSheetFromId(
+          esiKillmailData.victim.character_id.toString(),
+        );
+        const seatUserData = await seatRequester.getUserFromId(
+          seatCharacterData.data.user_id,
+        );
+        const discordMember = await interaction.guild?.members.fetch(
+          interaction.user.id,
+        );
+
+        if (discordMember == null) {
+          void interaction.editReply(
+            "해당 디스코드 닉네임이 시트에 등록되어 있지 않습니다.",
+          );
+          return;
+        }
+
+        if (seatUserData.data.name !== discordMember.displayName) {
+          void interaction.editReply(
+            "다른 메인 캐릭터에 등록된 캐릭터 입니다. 디스코드 계정과 연결된 시트 유저 계정에 해당 캐릭터를 추가해 주세요.",
+          );
+          return;
+        }
+
+        const query =
+          "INSERT INTO srp_records (killmail_id, main_char_id, lost_amount, amount, percentage, type_string, status_string) VALUES ($1, $2, $3, $4, $5, $6, $7)";
+        await databaseClient.query(query, [
+          zkillboardKillmailData.killmail_id,
+          seatUserData.data.main_character_id,
+          totalValue,
+          srpFinalValue,
+          srpPercent,
+          srpTypeString,
+          "pending",
+        ]);
+
+        void interaction.editReply(
+          `${discordMember.displayName}의 ${srpTypeString} SRP 신청: \n https://zkillboard.com/kill/${zkillboardKillmailData.killmail_id} \n ${getFormattedString(srpFinalValue, "number")} ISK (${getFormattedString(totalValue, "number")}ISK 의 ${getFormattedString(srpPercent, "percent")}%)`,
+        );
+      } catch (error) {
+        if (isAxiosError(error) && error.response?.status === 404) {
+          const characterNames = await esiRequester.getNamesFromIds([
+            esiKillmailData.victim.character_id,
+          ]);
+
+          void interaction.editReply(
+            `오류: ${characterNames[0].name}은(는) SeAT에 가입되지 않은 캐릭터입니다.`,
+          );
+          return;
+        }
+
+        if (error instanceof DatabaseError && error.code === "23505") {
+          void interaction.editReply(
+            "이미 해당 킬메일에 대한 SRP 신청이 존재합니다.",
+          );
+          return;
+        }
+
+        console.log(error);
+        void interaction.editReply("오류가 발생했습니다. 다시 시도해 주세요.");
+      }
     })();
   },
 };

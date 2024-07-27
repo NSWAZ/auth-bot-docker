@@ -645,10 +645,30 @@
          "max_value":30000000,
          "ship_name":"Enyo"
       },
+      "12729":{
+         "percentage":0.25,
+         "max_value":120000000,
+         "ship_name":"Crane"
+      },
       "12731":{
          "percentage":0.25,
          "max_value":120000000,
          "ship_name":"Bustard"
+      },
+      "12733":{
+         "percentage":0.25,
+         "max_value":120000000,
+         "ship_name":"Prorator"
+      },
+      "12735":{
+         "percentage":0.25,
+         "max_value":120000000,
+         "ship_name":"Prowler"
+      },
+      "12743":{
+         "percentage":0.25,
+         "max_value":120000000,
+         "ship_name":"Viator"
       },
       "12745":{
          "percentage":0.25,
@@ -1739,6 +1759,11 @@
          "percentage":0.25,
          "max_value":120000000,
          "ship_name":"Squall"
+      },
+      "81046":{
+         "percentage":0.25,
+         "max_value":120000000,
+         "ship_name":"Deluge"
       },
       "81047":{
          "percentage":0.25,
@@ -2263,9 +2288,25 @@
          "percentage":0.5,
          "ship_name":"Enyo"
       },
+      "12729":{
+         "percentage":1,
+         "ship_name":"Crane"
+      },
       "12731":{
          "percentage":1,
          "ship_name":"Bustard"
+      },
+      "12733":{
+         "percentage":1,
+         "ship_name":"Prorator"
+      },
+      "12735":{
+         "percentage":1,
+         "ship_name":"Prowler"
+      },
+      "12743":{
+         "percentage":1,
+         "ship_name":"Viator"
       },
       "12745":{
          "percentage":1,
@@ -3138,6 +3179,10 @@
       "81008":{
          "percentage":1,
          "ship_name":"Squall"
+      },
+      "81046":{
+         "percentage":1,
+         "ship_name":"Deluge"
       },
       "81047":{
          "percentage":1,

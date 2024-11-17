@@ -35,6 +35,13 @@ const SRPRequestCommands: SlashCommand = {
         .setDescription("솔로잉 / 스몰갱 SRP를 신청합니다.")
         .addStringOption((option) =>
           option.setName("url").setDescription("킬메일 주소").setRequired(true),
+        )
+        .addBooleanOption((option) =>
+          option
+            .setName("is_special_role")
+            .setDescription(
+              "특수 롤이거나 로지 로스인가요? (기입하지 않을 경우 아닌 것으로 간주됩니다)",
+            ),
         ),
     )
     .setDefaultMemberPermissions(0),
@@ -81,10 +88,11 @@ const SRPRequestCommands: SlashCommand = {
       switch (subcommand) {
         case "fleet":
           srpTypeString = "플릿";
-          srpPercent =
-            srpPercentDB.fleet_rules[
-              fieldName as keyof (typeof srpPercentDB)["fleet_rules"]
-            ].percentage;
+
+          if (interaction.options.getBoolean("is_special_role"))
+            srpPercent = 1.0;
+          else srpPercent = 0.5;
+
           srpFinalValue = totalValue * srpPercent;
           break;
         case "solo":

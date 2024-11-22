@@ -7,8 +7,8 @@ import {
   CollectorFilter,
   MessageComponentInteraction,
   TextChannel,
-  VoiceChannel,
   CategoryChannelResolvable,
+  VoiceChannel,
 } from "discord.js";
 import { SlashCommand } from "../library/types";
 
@@ -40,13 +40,15 @@ const GrillReloadCommand: SlashCommand = {
           .setStyle(ButtonStyle.Danger),
       );
 
-    // need for type assertion
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-    const targetChannel = interaction.options.getChannel("targetchannel") as
-      | TextChannel
-      | VoiceChannel
-      | null;
+    const targetChannel = interaction.options.getChannel("targetchannel");
     if (targetChannel === null) throw Error("목표 채널을 찾을 수 없습니다.");
+    if (
+      !(
+        targetChannel instanceof TextChannel ||
+        targetChannel instanceof VoiceChannel
+      )
+    )
+      throw Error("텍스트 채널이나 음성 채널만 불판을 갈 수 있습니다.");
 
     const targetChannelName = `<#${targetChannel.id}> 채널`;
     let responseString = targetChannelName;
@@ -63,6 +65,8 @@ const GrillReloadCommand: SlashCommand = {
 
         if (interaction.channel === null)
           throw Error("명령어 입력 채널을 찾을 수 없습니다.");
+        if (!(interaction.channel instanceof TextChannel))
+          throw Error("명령어 입력 채널은 텍스트 채널이어야 합니다.");
         const collected = await interaction.channel.awaitMessageComponent({
           filter,
           time: 30000,

@@ -10,6 +10,7 @@ import {
   GuildMember,
 } from "discord.js";
 import {
+  applyCommandAllowedGuildList,
   getAuditTargetNickname,
   loadEnvironmentVariables,
   reflectNewbieRoleChange,
@@ -84,6 +85,7 @@ client.once(Events.ClientReady, (c) => {
   };
 
   void sendAnnouncementMsgs(client, channelMsg);
+  void applyCommandAllowedGuildList(client);
 });
 
 client.on(Events.InteractionCreate, (interaction) => {

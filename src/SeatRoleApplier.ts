@@ -1,4 +1,4 @@
-import { SeatRequester } from "./library/handlers/SeatRequester";
+import { SeatRequester } from "./library/classes/SeatHandler";
 
 export class SeatRoleApplier {
   private seatRequester: SeatRequester = new SeatRequester();

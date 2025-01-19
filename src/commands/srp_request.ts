@@ -1,8 +1,8 @@
 import { SlashCommandBuilder } from "discord.js";
 import { SlashCommand } from "../library/types";
-import { ZkillboardRequester } from "../library/handlers/ZkillboardRequester";
-import { EsiRequester } from "../library/handlers/EsiRequester";
-import { SeatRequester } from "../library/handlers/SeatRequester";
+import { ZkillboardRequester } from "../library/classes/ZkillboardHandler";
+import { EsiRequester } from "../library/classes/EsiHandler";
+import { SeatRequester } from "../library/classes/SeatHandler";
 import { getFormattedString } from "../library/functions";
 import srpPercentDB from "../static/srp_data.json";
 import { isAxiosError } from "axios";

@@ -18,7 +18,7 @@ import {
   setDefaultLogLevel,
 } from "./library/functions";
 import { SeatRoleApplier } from "./SeatRoleApplier";
-import { CommandsHandler } from "./library/handlers/Commands";
+import { CommandsHandler } from "./library/classes/CommandHandler";
 import log from "loglevel";
 
 loadEnvironmentVariables();
@@ -31,6 +31,7 @@ const client = new Client({
     GatewayIntentBits.GuildMembers,
   ],
 });
+client.seatRoleApplier = new SeatRoleApplier();
 const commandsHandler = new CommandsHandler();
 
 void client.login(process.env.DISCORD_TOKEN);
@@ -41,7 +42,6 @@ client.once(Events.ClientReady, (c) => {
   void (async () => {
     client.commands = await commandsHandler.getCommandsFromDir();
   })();
-  client.seatRoleApplier = new SeatRoleApplier();
 
   const joinCapSuperGroup = new ButtonBuilder()
     .setStyle(ButtonStyle.Link)

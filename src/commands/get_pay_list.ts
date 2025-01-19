@@ -6,7 +6,7 @@ import {
 } from "discord.js";
 import { Pool } from "pg";
 import { SlashCommand } from "../library/types";
-import { EsiRequester } from "../library/handlers/EsiRequester";
+import { EsiRequester } from "../library/classes/EsiHandler";
 
 const databaseClient = new Pool({
   host: process.env.POSTGRES_HOST,

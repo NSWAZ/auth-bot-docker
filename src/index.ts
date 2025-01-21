@@ -17,8 +17,9 @@ import {
   sendAnnouncementMsgs,
   setDefaultLogLevel,
 } from "./library/functions";
-import { SeatRoleApplier } from "./SeatRoleApplier";
+import { SeatRoleApplier } from "./library/classes/SeatRoleApplier";
 import { CommandsHandler } from "./library/classes/CommandHandler";
+import { DatabaseHandler } from "./library/classes/DatabaseHandler";
 import log from "loglevel";
 
 loadEnvironmentVariables();
@@ -32,6 +33,7 @@ const client = new Client({
   ],
 });
 client.seatRoleApplier = new SeatRoleApplier();
+client.databaseHandler = new DatabaseHandler();
 const commandsHandler = new CommandsHandler();
 
 void client.login(process.env.DISCORD_TOKEN);
@@ -94,6 +96,41 @@ client.on(Events.InteractionCreate, (interaction) => {
   commandsHandler.executeCommand(interaction).catch(console.error);
 });
 
+client.on(Events.InteractionCreate, (interaction) => {
+  if (!interaction.isButton() || !interaction.customId.startsWith("pay_"))
+    return;
+
+  if (interaction.customId === "pay_confirmed") {
+    void (async () => {
+      if (client.databaseHandler === undefined)
+        throw new Error("DB handler is not initd");
+
+      await client.databaseHandler.query(
+        "UPDATE srp_records SET status_string = 'paid' WHERE status_string = 'wait_paid'",
+      );
+
+      await interaction.message.edit({
+        content: "SRP 처리가 완료되었습니다.",
+        components: [],
+      });
+    })();
+  } else if (interaction.customId === "pay_cancel") {
+    void (async () => {
+      if (client.databaseHandler === undefined)
+        throw new Error("DB handler is not initd");
+
+      await client.databaseHandler.query(
+        "UPDATE srp_records SET status_string = 'approved' WHERE status_string = 'wait_paid'",
+      );
+
+      await interaction.message.edit({
+        content: "SRP 처리가 취소되었습니다.",
+        components: [],
+      });
+    })();
+  }
+});
+
 client.on(Events.GuildAuditLogEntryCreate, (auditLog, guild) => {
   if (
     auditLog.action != AuditLogEvent.MemberRoleUpdate ||
@@ -108,16 +145,24 @@ client.on(Events.GuildAuditLogEntryCreate, (auditLog, guild) => {
 });
 
 function add(nickname: string) {
+  if (client.seatRoleApplier === undefined)
+    throw new Error("SeatRoleApplier is not initd");
+
   void client.seatRoleApplier.add(nickname, "48");
 }
 
 function remove(nickname: string) {
+  if (client.seatRoleApplier === undefined)
+    throw new Error("SeatRoleApplier is not initd");
+
   void client.seatRoleApplier.remove(nickname, "48");
 }
 
 client.on(Events.InteractionCreate, (interaction) => {
   if (!interaction.isButton() || interaction.customId != "joinCOSUIChat")
     return;
+  if (client.seatRoleApplier === undefined)
+    throw new Error("SeatRoleApplier is not initd");
 
   if (
     (interaction.member as GuildMember).roles.cache.filter(

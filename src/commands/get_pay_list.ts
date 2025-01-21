@@ -4,18 +4,11 @@ import {
   ButtonBuilder,
   ButtonStyle,
 } from "discord.js";
-import { Pool } from "pg";
 import { SlashCommand } from "../library/types";
 import { EsiRequester } from "../library/classes/EsiHandler";
+import { DatabaseHandler } from "../library/classes/DatabaseHandler";
 
-const databaseClient = new Pool({
-  host: process.env.POSTGRES_HOST,
-  user: process.env.POSTGRES_USER,
-  password: process.env.POSTGRES_PW,
-  database: process.env.POSTGRES_DB,
-  port: 5432,
-  max: 5,
-});
+const databaseClient = new DatabaseHandler();
 
 const GetPayListCommand: SlashCommand = {
   command: new SlashCommandBuilder()
@@ -30,6 +23,10 @@ const GetPayListCommand: SlashCommand = {
         .setCustomId("pay_confirmed")
         .setLabel("모두 입금 완료 (주의: 되돌릴 수 없습니다)")
         .setStyle(ButtonStyle.Danger),
+      new ButtonBuilder()
+        .setCustomId("pay_cancel")
+        .setLabel("입금 취소")
+        .setStyle(ButtonStyle.Secondary),
     );
 
     const query = "SELECT * FROM srp_records WHERE status_string = 'approved'";
@@ -73,6 +70,10 @@ const GetPayListCommand: SlashCommand = {
             content: message + "```",
             components: [row],
           });
+
+          void databaseClient.query(
+            "UPDATE srp_records SET status_string = 'wait_paid' WHERE status_string = 'approved'",
+          );
         }
       } catch (error) {
         console.error(error);

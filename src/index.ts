@@ -17,7 +17,7 @@ import {
   sendAnnouncementMsgs,
   setDefaultLogLevel,
 } from "./library/functions";
-import { SeatRoleApplier } from "./library/classes/SeatRoleApplier";
+import { SeatRoleApplier } from "./library/classes/seat/SeatRoleApplier";
 import { CommandsHandler } from "./library/classes/CommandHandler";
 import { DatabaseHandler } from "./library/classes/DatabaseHandler";
 import log from "loglevel";

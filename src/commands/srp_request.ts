@@ -2,7 +2,7 @@ import { SlashCommandBuilder } from "discord.js";
 import { SlashCommand } from "../library/types";
 import { ZkillboardRequester } from "../library/classes/ZkillboardHandler";
 import { EsiRequester } from "../library/classes/EsiHandler";
-import { SeatRequester } from "../library/classes/SeatHandler";
+import { SeatHanlder } from "../library/classes/seat/SeatHandler";
 import { getFormattedString } from "../library/functions";
 import srpPercentDB from "../static/srp_data.json";
 import { isAxiosError } from "axios";
@@ -117,11 +117,11 @@ const SRPRequestCommands: SlashCommand = {
       }
 
       try {
-        const seatRequester = new SeatRequester();
-        const seatCharacterData = await seatRequester.getCharacterSheetFromId(
+        const seatHanler = new SeatHanlder();
+        const seatCharacterData = await seatHanler.getCharacterSheetFromId(
           esiKillmailData.victim.character_id.toString(),
         );
-        const seatUserData = await seatRequester.getUserFromId(
+        const seatUserData = await seatHanler.getUserFromId(
           seatCharacterData.data.user_id,
         );
         const discordMember = await interaction.guild?.members.fetch(

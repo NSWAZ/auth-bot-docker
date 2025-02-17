@@ -155,7 +155,7 @@ const SRPRequestCommands: SlashCommand = {
         ]);
 
         void interaction.editReply(
-          `${discordMember.displayName}의 ${srpTypeString} SRP 신청: \n https://zkillboard.com/kill/${zkillboardKillmailData.killmail_id} \n ${getFormattedString(srpFinalValue, "number")} ISK (${getFormattedString(totalValue, "number")}ISK 의 ${getFormattedString(srpPercent, "percent")}%)`,
+          `${discordMember.displayName}의 ${srpTypeString} SRP 신청: \n https://zkillboard.com/kill/${zkillboardKillmailData.killmail_id} \n ${getFormattedString(srpFinalValue, "number")} ISK (${getFormattedString(totalValue, "number")} ISK 의 ${getFormattedString(srpPercent, "percent")}%)`,
         );
       } catch (error) {
         if (isAxiosError(error) && error.response?.status === 404) {

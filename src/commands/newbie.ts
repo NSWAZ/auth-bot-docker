@@ -42,11 +42,11 @@ const NewbieCommand: SlashCommand = {
     const nickname = member.nickname;
     if (nickname === null) throw new Error("nickname is null.");
 
-    if (interaction.client.seatRoleApplier === undefined)
-      throw new Error("SeatRoleApplier is not initd");
+    if (interaction.client.seatRoleEngine === undefined)
+      throw new Error("SeatRoleEngine is not initd");
 
     if (subcommand === "add") {
-      void interaction.client.seatRoleApplier
+      void interaction.client.seatRoleEngine
         .add(nickname, "48")
         .then(() =>
           interaction.editReply(
@@ -54,7 +54,7 @@ const NewbieCommand: SlashCommand = {
           ),
         );
     } else if (subcommand === "remove") {
-      void interaction.client.seatRoleApplier
+      void interaction.client.seatRoleEngine
         .remove(nickname, "48")
         .then(() =>
           interaction.editReply(

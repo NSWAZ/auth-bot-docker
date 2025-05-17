@@ -17,9 +17,9 @@ import {
   sendAnnouncementMsgs,
   setDefaultLogLevel,
 } from "./library/functions";
-import { SeatRoleApplier } from "./library/classes/seat/SeatRoleApplier";
+import { SeatRoleEngine } from "./library/classes/seat/SeatRoleEngine";
 import { CommandsHandler } from "./library/classes/CommandHandler";
-import { DatabaseHandler } from "./library/classes/DatabaseHandler";
+import { DatabaseEngine } from "./library/classes/DatabaseEngine";
 import log from "loglevel";
 
 loadEnvironmentVariables();
@@ -32,9 +32,8 @@ const client = new Client({
     GatewayIntentBits.GuildMembers,
   ],
 });
-client.seatRoleApplier = new SeatRoleApplier();
-client.databaseHandler = new DatabaseHandler();
-const commandsHandler = new CommandsHandler();
+client.databaseEngine = new DatabaseEngine();
+client.seatRoleEngine = new SeatRoleEngine();
 
 void client.login(process.env.DISCORD_TOKEN);
 
@@ -42,7 +41,7 @@ client.once(Events.ClientReady, (c) => {
   log.info(`Ready! Logged in as ${c.user.tag}`);
 
   void (async () => {
-    client.commands = await commandsHandler.getCommandsFromDir();
+    client.commands = await CommandsHandler.getCommandsFromDir();
   })();
 
   const joinCapSuperGroup = new ButtonBuilder()
@@ -93,7 +92,7 @@ client.once(Events.ClientReady, (c) => {
 client.on(Events.InteractionCreate, (interaction) => {
   if (!interaction.isChatInputCommand() || !interaction.guild) return;
 
-  commandsHandler.executeCommand(interaction).catch(console.error);
+  CommandsHandler.executeCommand(interaction).catch(console.error);
 });
 
 client.on(Events.InteractionCreate, (interaction) => {
@@ -102,10 +101,10 @@ client.on(Events.InteractionCreate, (interaction) => {
 
   if (interaction.customId === "pay_confirmed") {
     void (async () => {
-      if (client.databaseHandler === undefined)
+      if (client.databaseEngine === undefined)
         throw new Error("DB handler is not initd");
 
-      await client.databaseHandler.query(
+      await client.databaseEngine.query(
         "UPDATE srp_records SET status_string = 'paid' WHERE status_string = 'wait_paid'",
       );
 
@@ -116,10 +115,10 @@ client.on(Events.InteractionCreate, (interaction) => {
     })();
   } else if (interaction.customId === "pay_cancel") {
     void (async () => {
-      if (client.databaseHandler === undefined)
+      if (client.databaseEngine === undefined)
         throw new Error("DB handler is not initd");
 
-      await client.databaseHandler.query(
+      await client.databaseEngine.query(
         "UPDATE srp_records SET status_string = 'approved' WHERE status_string = 'wait_paid'",
       );
 
@@ -145,31 +144,31 @@ client.on(Events.GuildAuditLogEntryCreate, (auditLog, guild) => {
 });
 
 function add(nickname: string) {
-  if (client.seatRoleApplier === undefined)
-    throw new Error("SeatRoleApplier is not initd");
+  if (client.seatRoleEngine === undefined)
+    throw new Error("SeatRoleEngine is not initd");
 
-  void client.seatRoleApplier.add(nickname, "48");
+  void client.seatRoleEngine.add(nickname, "48");
 }
 
 function remove(nickname: string) {
-  if (client.seatRoleApplier === undefined)
-    throw new Error("SeatRoleApplier is not initd");
+  if (client.seatRoleEngine === undefined)
+    throw new Error("SeatRoleEngine is not initd");
 
-  void client.seatRoleApplier.remove(nickname, "48");
+  void client.seatRoleEngine.remove(nickname, "48");
 }
 
 client.on(Events.InteractionCreate, (interaction) => {
   if (!interaction.isButton() || interaction.customId != "joinCOSUIChat")
     return;
-  if (client.seatRoleApplier === undefined)
-    throw new Error("SeatRoleApplier is not initd");
+  if (client.seatRoleEngine === undefined)
+    throw new Error("SeatRoleEngine is not initd");
 
   if (
     (interaction.member as GuildMember).roles.cache.filter(
       (role) => role.id === "1212067094791721041",
     ).size > 0
   ) {
-    void client.seatRoleApplier.remove(
+    void client.seatRoleEngine.remove(
       (interaction.member as GuildMember).nickname!,
       "49",
     );
@@ -181,7 +180,7 @@ client.on(Events.InteractionCreate, (interaction) => {
     return;
   }
 
-  void client.seatRoleApplier.add(
+  void client.seatRoleEngine.add(
     (interaction.member as GuildMember).nickname!,
     "49",
   );

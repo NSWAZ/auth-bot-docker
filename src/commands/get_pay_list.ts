@@ -6,9 +6,7 @@ import {
 } from "discord.js";
 import { SlashCommand } from "../library/types";
 import { EsiRequester } from "../library/classes/EsiHandler";
-import { DatabaseHandler } from "../library/classes/DatabaseHandler";
-
-const databaseClient = new DatabaseHandler();
+import { DatabaseEngine } from "../library/classes/DatabaseEngine";
 
 const GetPayListCommand: SlashCommand = {
   command: new SlashCommandBuilder()
@@ -32,8 +30,10 @@ const GetPayListCommand: SlashCommand = {
     const query = "SELECT * FROM srp_records WHERE status_string = 'approved'";
 
     void (async () => {
-      try {
-        const srp_records = await databaseClient.query(query);
+        if (interaction.client.databaseEngine === undefined)
+          throw new Error("DatabaseEngine is not initd");
+
+        const srp_records = await interaction.client.databaseEngine.query(query);
 
         if (srp_records.rowCount === 0) {
           void interaction.reply("아직 승인된 SRP 신청이 없습니다.");
@@ -53,8 +53,7 @@ const GetPayListCommand: SlashCommand = {
             }
           }
 
-          const esiRequester = new EsiRequester();
-          const names = await esiRequester.getNamesFromIds(
+          const names = await EsiRequester.getNamesFromIds(
             Object.keys(pay_list).map(Number),
           );
 
@@ -71,14 +70,10 @@ const GetPayListCommand: SlashCommand = {
             components: [row],
           });
 
-          void databaseClient.query(
+          void interaction.client.databaseEngine.query(
             "UPDATE srp_records SET status_string = 'wait_paid' WHERE status_string = 'approved'",
           );
         }
-      } catch (error) {
-        console.error(error);
-        void interaction.reply("오류가 발생했습니다.");
-      }
     })();
   },
 };

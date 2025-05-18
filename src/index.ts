@@ -18,6 +18,7 @@ import { CommandsHandler } from "./library/classes/CommandHandler";
 import { DatabaseEngine } from "./library/classes/DatabaseEngine";
 import log from "loglevel";
 import cron from "node-cron";
+import { checkInactives } from "./functionApplyInactives";
 
 loadEnvironmentVariables();
 setDefaultLogLevel();
@@ -27,6 +28,7 @@ const client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildModeration,
     GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.MessageContent,
   ],
 });
 client.databaseEngine = new DatabaseEngine();
@@ -87,6 +89,7 @@ client.once(Events.ClientReady, (c) => {
 
   void sendAnnouncementMsgs(client, channelMsg);
   void applyCommandAllowedGuildList(client);
+  void checkInactives(client);
 });
 
 /**
@@ -143,4 +146,6 @@ client.on(Events.InteractionCreate, (interaction) => {
  */
 cron.schedule("0 0,12 * * *", () => {
   log.info("Time to check SRP");
+
+  void checkInactives(client);
 });

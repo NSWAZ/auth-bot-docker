@@ -2,7 +2,6 @@ import {
   Client,
   GatewayIntentBits,
   Events,
-  AuditLogEvent,
   MessageCreateOptions,
   ButtonBuilder,
   ButtonStyle,
@@ -11,9 +10,7 @@ import {
 } from "discord.js";
 import {
   applyCommandAllowedGuildList,
-  getAuditTargetNickname,
   loadEnvironmentVariables,
-  reflectNewbieRoleChange,
   sendAnnouncementMsgs,
   setDefaultLogLevel,
 } from "./library/functions";
@@ -95,6 +92,10 @@ client.on(Events.InteractionCreate, (interaction) => {
   CommandsHandler.executeCommand(interaction).catch(console.error);
 });
 
+/**
+ * SRP 처리 버튼 이벤트 핸들러
+ * TODO: 이벤트 핸들러 분리
+ */
 client.on(Events.InteractionCreate, (interaction) => {
   if (!interaction.isButton() || !interaction.customId.startsWith("pay_"))
     return;
@@ -128,64 +129,4 @@ client.on(Events.InteractionCreate, (interaction) => {
       });
     })();
   }
-});
-
-client.on(Events.GuildAuditLogEntryCreate, (auditLog, guild) => {
-  if (
-    auditLog.action != AuditLogEvent.MemberRoleUpdate ||
-    auditLog.executorId === "1066230195473883136"
-  )
-    return;
-
-  void (async () => {
-    const nickname = await getAuditTargetNickname(auditLog, guild);
-    void reflectNewbieRoleChange(auditLog, nickname, add, remove);
-  })();
-});
-
-function add(nickname: string) {
-  if (client.seatRoleEngine === undefined)
-    throw new Error("SeatRoleEngine is not initd");
-
-  void client.seatRoleEngine.add(nickname, "48");
-}
-
-function remove(nickname: string) {
-  if (client.seatRoleEngine === undefined)
-    throw new Error("SeatRoleEngine is not initd");
-
-  void client.seatRoleEngine.remove(nickname, "48");
-}
-
-client.on(Events.InteractionCreate, (interaction) => {
-  if (!interaction.isButton() || interaction.customId != "joinCOSUIChat")
-    return;
-  if (client.seatRoleEngine === undefined)
-    throw new Error("SeatRoleEngine is not initd");
-
-  if (
-    (interaction.member as GuildMember).roles.cache.filter(
-      (role) => role.id === "1212067094791721041",
-    ).size > 0
-  ) {
-    void client.seatRoleEngine.remove(
-      (interaction.member as GuildMember).nickname!,
-      "49",
-    );
-    void interaction.reply({
-      content:
-        "콘스프 롤을 제거했습니다. (콘스프 꼽 맴버에게는 적용되지 않습니다)",
-      ephemeral: true,
-    });
-    return;
-  }
-
-  void client.seatRoleEngine.add(
-    (interaction.member as GuildMember).nickname!,
-    "49",
-  );
-  void interaction.reply({
-    content: "콘스프 롤을 추가했습니다.",
-    ephemeral: true,
-  });
 });

@@ -6,7 +6,6 @@ import {
   ButtonBuilder,
   ButtonStyle,
   ActionRowBuilder,
-  GuildMember,
 } from "discord.js";
 import {
   applyCommandAllowedGuildList,
@@ -18,6 +17,7 @@ import { SeatRoleEngine } from "./library/classes/seat/SeatRoleEngine";
 import { CommandsHandler } from "./library/classes/CommandHandler";
 import { DatabaseEngine } from "./library/classes/DatabaseEngine";
 import log from "loglevel";
+import cron from "node-cron";
 
 loadEnvironmentVariables();
 setDefaultLogLevel();
@@ -34,6 +34,9 @@ client.seatRoleEngine = new SeatRoleEngine();
 
 void client.login(process.env.DISCORD_TOKEN);
 
+/**
+ * 클라이언트 준비 이벤트 핸들러
+ */
 client.once(Events.ClientReady, (c) => {
   log.info(`Ready! Logged in as ${c.user.tag}`);
 
@@ -86,6 +89,9 @@ client.once(Events.ClientReady, (c) => {
   void applyCommandAllowedGuildList(client);
 });
 
+/**
+ * 채널 내 명령어 이벤트 핸들러
+ */
 client.on(Events.InteractionCreate, (interaction) => {
   if (!interaction.isChatInputCommand() || !interaction.guild) return;
 
@@ -129,4 +135,12 @@ client.on(Events.InteractionCreate, (interaction) => {
       });
     })();
   }
+});
+
+/**
+ * 매일 0시, 12시에 실행되는 작업
+ * 인액티브 목록 불러와서 반영
+ */
+cron.schedule("0 0,12 * * *", () => {
+  log.info("Time to check SRP");
 });

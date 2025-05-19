@@ -9,6 +9,7 @@ RUN npm run build
 FROM node:22-alpine as install
 WORKDIR /usr/src/app
 COPY ./package.json ./
+COPY ./package-lock.json ./
 RUN npm install --omit=dev
 
 FROM gcr.io/distroless/nodejs22-debian12:latest as runtime

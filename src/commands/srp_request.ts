@@ -69,13 +69,11 @@ const SRPRequestCommands: SlashCommand = {
     void (async () => {
       await interaction.deferReply();
 
-      const zkillboardRequester = new ZkillboardRequester();
       const zkillboardKillmailData =
-        await zkillboardRequester.getKillmailInfo(killmailID);
+        await ZkillboardRequester.getKillmailInfo(killmailID);
       const totalValue = zkillboardKillmailData.zkb.totalValue;
 
-      const esiRequester = new EsiRequester();
-      const esiKillmailData = await esiRequester.getKillmailInfo(
+      const esiKillmailData = await EsiRequester.getKillmailInfo(
         zkillboardKillmailData.killmail_id,
         zkillboardKillmailData.zkb.hash,
       );
@@ -117,11 +115,10 @@ const SRPRequestCommands: SlashCommand = {
       }
 
       try {
-        const seatHanler = new SeatHanlder();
-        const seatCharacterData = await seatHanler.getCharacterSheetFromId(
+        const seatCharacterData = await SeatHanlder.getCharacterSheetFromId(
           esiKillmailData.victim.character_id.toString(),
         );
-        const seatUserData = await seatHanler.getUserFromId(
+        const seatUserData = await SeatHanlder.getUserFromId(
           seatCharacterData.data.user_id,
         );
         const discordMember = await interaction.guild?.members.fetch(
@@ -159,7 +156,7 @@ const SRPRequestCommands: SlashCommand = {
         );
       } catch (error) {
         if (isAxiosError(error) && error.response?.status === 404) {
-          const characterNames = await esiRequester.getNamesFromIds([
+          const characterNames = await EsiRequester.getNamesFromIds([
             esiKillmailData.victim.character_id,
           ]);
 

@@ -2,25 +2,23 @@ import {
   Client,
   GatewayIntentBits,
   Events,
-  AuditLogEvent,
   MessageCreateOptions,
   ButtonBuilder,
   ButtonStyle,
   ActionRowBuilder,
-  GuildMember,
 } from "discord.js";
 import {
   applyCommandAllowedGuildList,
-  getAuditTargetNickname,
   loadEnvironmentVariables,
-  reflectNewbieRoleChange,
   sendAnnouncementMsgs,
   setDefaultLogLevel,
 } from "./library/functions";
-import { SeatRoleApplier } from "./library/classes/seat/SeatRoleApplier";
+import { SeatRoleEngine } from "./library/classes/seat/SeatRoleEngine";
 import { CommandsHandler } from "./library/classes/CommandHandler";
-import { DatabaseHandler } from "./library/classes/DatabaseHandler";
+import { DatabaseEngine } from "./library/classes/DatabaseEngine";
 import log from "loglevel";
+import cron from "node-cron";
+import { checkInactives } from "./functionApplyInactives";
 
 loadEnvironmentVariables();
 setDefaultLogLevel();
@@ -30,19 +28,22 @@ const client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildModeration,
     GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.MessageContent,
   ],
 });
-client.seatRoleApplier = new SeatRoleApplier();
-client.databaseHandler = new DatabaseHandler();
-const commandsHandler = new CommandsHandler();
+client.databaseEngine = new DatabaseEngine();
+client.seatRoleEngine = new SeatRoleEngine();
 
 void client.login(process.env.DISCORD_TOKEN);
 
+/**
+ * 클라이언트 준비 이벤트 핸들러
+ */
 client.once(Events.ClientReady, (c) => {
   log.info(`Ready! Logged in as ${c.user.tag}`);
 
   void (async () => {
-    client.commands = await commandsHandler.getCommandsFromDir();
+    client.commands = await CommandsHandler.getCommandsFromDir();
   })();
 
   const joinCapSuperGroup = new ButtonBuilder()
@@ -88,24 +89,32 @@ client.once(Events.ClientReady, (c) => {
 
   void sendAnnouncementMsgs(client, channelMsg);
   void applyCommandAllowedGuildList(client);
+  void checkInactives(client);
 });
 
+/**
+ * 채널 내 명령어 이벤트 핸들러
+ */
 client.on(Events.InteractionCreate, (interaction) => {
   if (!interaction.isChatInputCommand() || !interaction.guild) return;
 
-  commandsHandler.executeCommand(interaction).catch(console.error);
+  CommandsHandler.executeCommand(interaction).catch(console.error);
 });
 
+/**
+ * SRP 처리 버튼 이벤트 핸들러
+ * TODO: 이벤트 핸들러 분리
+ */
 client.on(Events.InteractionCreate, (interaction) => {
   if (!interaction.isButton() || !interaction.customId.startsWith("pay_"))
     return;
 
   if (interaction.customId === "pay_confirmed") {
     void (async () => {
-      if (client.databaseHandler === undefined)
+      if (client.databaseEngine === undefined)
         throw new Error("DB handler is not initd");
 
-      await client.databaseHandler.query(
+      await client.databaseEngine.query(
         "UPDATE srp_records SET status_string = 'paid' WHERE status_string = 'wait_paid'",
       );
 
@@ -116,10 +125,10 @@ client.on(Events.InteractionCreate, (interaction) => {
     })();
   } else if (interaction.customId === "pay_cancel") {
     void (async () => {
-      if (client.databaseHandler === undefined)
+      if (client.databaseEngine === undefined)
         throw new Error("DB handler is not initd");
 
-      await client.databaseHandler.query(
+      await client.databaseEngine.query(
         "UPDATE srp_records SET status_string = 'approved' WHERE status_string = 'wait_paid'",
       );
 
@@ -131,62 +140,12 @@ client.on(Events.InteractionCreate, (interaction) => {
   }
 });
 
-client.on(Events.GuildAuditLogEntryCreate, (auditLog, guild) => {
-  if (
-    auditLog.action != AuditLogEvent.MemberRoleUpdate ||
-    auditLog.executorId === "1066230195473883136"
-  )
-    return;
+/**
+ * 매일 0시, 12시에 실행되는 작업
+ * 인액티브 목록 불러와서 반영
+ */
+cron.schedule("0 0,12 * * *", () => {
+  log.info("Time to check SRP");
 
-  void (async () => {
-    const nickname = await getAuditTargetNickname(auditLog, guild);
-    void reflectNewbieRoleChange(auditLog, nickname, add, remove);
-  })();
-});
-
-function add(nickname: string) {
-  if (client.seatRoleApplier === undefined)
-    throw new Error("SeatRoleApplier is not initd");
-
-  void client.seatRoleApplier.add(nickname, "48");
-}
-
-function remove(nickname: string) {
-  if (client.seatRoleApplier === undefined)
-    throw new Error("SeatRoleApplier is not initd");
-
-  void client.seatRoleApplier.remove(nickname, "48");
-}
-
-client.on(Events.InteractionCreate, (interaction) => {
-  if (!interaction.isButton() || interaction.customId != "joinCOSUIChat")
-    return;
-  if (client.seatRoleApplier === undefined)
-    throw new Error("SeatRoleApplier is not initd");
-
-  if (
-    (interaction.member as GuildMember).roles.cache.filter(
-      (role) => role.id === "1212067094791721041",
-    ).size > 0
-  ) {
-    void client.seatRoleApplier.remove(
-      (interaction.member as GuildMember).nickname!,
-      "49",
-    );
-    void interaction.reply({
-      content:
-        "콘스프 롤을 제거했습니다. (콘스프 꼽 맴버에게는 적용되지 않습니다)",
-      ephemeral: true,
-    });
-    return;
-  }
-
-  void client.seatRoleApplier.add(
-    (interaction.member as GuildMember).nickname!,
-    "49",
-  );
-  void interaction.reply({
-    content: "콘스프 롤을 추가했습니다.",
-    ephemeral: true,
-  });
+  void checkInactives(client);
 });

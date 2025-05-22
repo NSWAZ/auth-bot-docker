@@ -46,17 +46,15 @@ export async function checkInactives(client: Client) {
     const inactiveMembers = members.filter(member => 
       member.roles.cache.has("824637601091682353")
     );
-
-    log.info(`Found ${inactiveMembers.size} inactive members :`);
     
     // 각 인액티브 멤버의 정보 출력
     let inactiveMembersString = "";
     let inactiveMemberIds: string[] = [];
     inactiveMembers.forEach(member => {
-      inactiveMembersString += `${member.user.tag} (${member.id})`;
+      inactiveMembersString += `, ${member.user.tag} (${member.nickname})`;
       inactiveMemberIds.push(member.id);
     });
-    log.info(inactiveMembersString);
+    log.info(`Found ${inactiveMembers.size} inactive members : ${inactiveMembersString}`);
 
     // 채널 메시지 가져오기
     const channel = await client.channels.fetch("1373646420397260914") as TextChannel;
@@ -68,6 +66,8 @@ export async function checkInactives(client: Client) {
     const messages = await channel.messages.fetch({ limit: 100 });
     log.info(`Found ${messages.size} messages in channel`);
 
+    let processedChannelsString = "Processed channels: ";
+    let processedCategoriesString = "Processed categories: ";
     // 메시지에서 채널/카테고리 ID 추출 및 권한 설정
     for (const message of messages.values()) {
       const content = message.content;
@@ -84,14 +84,13 @@ export async function checkInactives(client: Client) {
         if (!channel || channel.type !== ChannelType.GuildText)
           throw new Error("Channel not found");
       
-        log.info(`Processing channel: ${channel.name}`);
-        
+        processedChannelsString += `, ${channel.name}`;
         await setChannelPermissions(channel, inactiveMemberIds);
       }
       else if (categoryMatches) {
         const match = categoryMatches[0];
         const categoryName = match.replace('CT:', '').trim();
-        log.info(`Processing category: ${categoryName}`);
+        processedCategoriesString += `, ${categoryName}`;
         
         const category = guild.channels.cache.find(
           ch => ch.type === ChannelType.GuildCategory && ch.name === categoryName
@@ -101,6 +100,8 @@ export async function checkInactives(client: Client) {
       }
     }
 
+    log.info(processedChannelsString);
+    log.info(processedCategoriesString);
     log.info("Inactive check completed");
   } catch (error) {
     log.error("Error checking inactives:", error);

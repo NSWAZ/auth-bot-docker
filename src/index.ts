@@ -141,10 +141,10 @@ client.on(Events.InteractionCreate, (interaction) => {
 });
 
 /**
- * 매일 0시, 12시에 실행되는 작업
+ * 매 시간마다 실행되는 작업
  * 인액티브 목록 불러와서 반영
  */
-cron.schedule("0 0,12 * * *", () => {
+cron.schedule("0 * * * *", () => {
   log.info("Time to check SRP");
 
   void checkInactives(client);

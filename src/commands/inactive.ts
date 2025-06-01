@@ -37,7 +37,7 @@ const InactiveCommand: SlashCommand = {
     if (interaction.guild === null)
       throw new Error("interaction.guild is null.");
     if (user === null) throw new Error("user is null.");
-    
+
     const member = interaction.guild.members.cache.get(user.id);
     if (member === undefined) throw new Error("member is undefined.");
 

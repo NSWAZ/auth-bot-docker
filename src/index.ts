@@ -12,10 +12,9 @@ import {
   loadEnvironmentVariables,
   sendAnnouncementMsgs,
   setDefaultLogLevel,
-} from "./library/functions";
-import { SeatRoleEngine } from "./library/classes/seat/SeatRoleEngine";
-import { CommandsHandler } from "./library/classes/CommandHandler";
-import { DatabaseEngine } from "./library/classes/DatabaseEngine";
+} from "./lib/functions";
+import { SeatRoleEngine } from "./lib/classes/seat/SeatRoleEngine";
+import { CommandsHandler } from "./lib/classes/CommandHandler";
 import log from "loglevel";
 import cron from "node-cron";
 import { checkInactives } from "./functionApplyInactives";
@@ -31,7 +30,6 @@ const client = new Client({
     GatewayIntentBits.MessageContent,
   ],
 });
-client.databaseEngine = new DatabaseEngine();
 client.seatRoleEngine = new SeatRoleEngine();
 
 void client.login(process.env.DISCORD_TOKEN);
@@ -99,45 +97,6 @@ client.on(Events.InteractionCreate, (interaction) => {
   if (!interaction.isChatInputCommand() || !interaction.guild) return;
 
   CommandsHandler.executeCommand(interaction).catch(console.error);
-});
-
-/**
- * SRP 처리 버튼 이벤트 핸들러
- * TODO: 이벤트 핸들러 분리
- */
-client.on(Events.InteractionCreate, (interaction) => {
-  if (!interaction.isButton() || !interaction.customId.startsWith("pay_"))
-    return;
-
-  if (interaction.customId === "pay_confirmed") {
-    void (async () => {
-      if (client.databaseEngine === undefined)
-        throw new Error("DB handler is not initd");
-
-      await client.databaseEngine.query(
-        "UPDATE srp_records SET status_string = 'paid' WHERE status_string = 'wait_paid'",
-      );
-
-      await interaction.message.edit({
-        content: "SRP 처리가 완료되었습니다.",
-        components: [],
-      });
-    })();
-  } else if (interaction.customId === "pay_cancel") {
-    void (async () => {
-      if (client.databaseEngine === undefined)
-        throw new Error("DB handler is not initd");
-
-      await client.databaseEngine.query(
-        "UPDATE srp_records SET status_string = 'approved' WHERE status_string = 'wait_paid'",
-      );
-
-      await interaction.message.edit({
-        content: "SRP 처리가 취소되었습니다.",
-        components: [],
-      });
-    })();
-  }
 });
 
 /**

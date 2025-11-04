@@ -1,5 +1,5 @@
 import { SlashCommandBuilder } from "discord.js";
-import { SlashCommand } from "../library/types";
+import { SlashCommand } from "../lib/types";
 
 const NewbieCommand: SlashCommand = {
   command: new SlashCommandBuilder()

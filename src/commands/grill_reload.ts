@@ -10,7 +10,7 @@ import {
   CategoryChannelResolvable,
   VoiceChannel,
 } from "discord.js";
-import { SlashCommand } from "../library/types";
+import { SlashCommand } from "../lib/types";
 
 const GrillReloadCommand: SlashCommand = {
   command: new SlashCommandBuilder()

@@ -8,7 +8,7 @@ axios.interceptors.request.use((config) => {
   return config;
 });
 
-export class SeatHanlder {
+export class SeatHandler {
   private static DeleteHeaders: object;
   private static PostHeaders: object;
   private static GetHeaders: object;
@@ -17,16 +17,16 @@ export class SeatHanlder {
     if (process.env.SEAT_TOKEN === undefined)
       throw new Error("SEAT_TOKEN is not defined in .env file.");
 
-    SeatHanlder.DeleteHeaders = {
+    SeatHandler.DeleteHeaders = {
       accept: "*/*",
       "X-TOKEN": process.env.SEAT_TOKEN,
     };
-    SeatHanlder.PostHeaders = {
+    SeatHandler.PostHeaders = {
       accept: "*/*",
       "Content-Type": "application/json",
       "X-TOKEN": process.env.SEAT_TOKEN,
     };
-    SeatHanlder.GetHeaders = {
+    SeatHandler.GetHeaders = {
       accept: "application/json",
       "X-TOKEN": process.env.SEAT_TOKEN,
     };

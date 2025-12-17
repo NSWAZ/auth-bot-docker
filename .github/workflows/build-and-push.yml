@@ -1,4 +1,8 @@
+<<<<<<<< HEAD:.github/workflows/build-push.yml
 name: Build and Push
+========
+name: Build and Push Docker Image
+>>>>>>>> 81a7ce8 (feat: Implement recruiting system with state management and backup functionality):.github/workflows/build-and-push.yml
 
 on:
   push:

@@ -1,4 +1,5 @@
 import { SlashCommandBuilder } from "discord.js";
+import { DiscordHandler } from "../lib/classes/DiscordHandler";
 import { SlashCommand } from "../lib/types";
 
 const NewbieCommand: SlashCommand = {
@@ -29,40 +30,9 @@ const NewbieCommand: SlashCommand = {
     )
     .setDefaultMemberPermissions(0),
   execute: (interaction) => {
-    void interaction.deferReply();
-
-    const subcommand = interaction.options.getSubcommand();
-    const user = interaction.options.getUser("targetuser");
-
-    if (interaction.guild === null)
-      throw new Error("interaction.guild is null.");
-    if (user === null) throw new Error("user is null.");
-    const member = interaction.guild.members.cache.get(user.id);
-    if (member === undefined) throw new Error("member is undefined.");
-    const nickname = member.nickname;
-    if (nickname === null) throw new Error("nickname is null.");
-
-    if (interaction.client.seatRoleEngine === undefined)
-      throw new Error("SeatRoleEngine is not initd");
-
-    if (subcommand === "add") {
-      void interaction.client.seatRoleEngine
-        .add(nickname, "48")
-        .then(() =>
-          interaction.editReply(
-            `${user.toString()}님에게 뉴비 롤을 부여했습니다.`,
-          ),
-        );
-    } else if (subcommand === "remove") {
-      void interaction.client.seatRoleEngine
-        .remove(nickname, "48")
-        .then(() =>
-          interaction.editReply(
-            `${user.toString()}님에게 뉴비 롤을 제거했습니다.`,
-          ),
-        );
-    }
+    DiscordHandler.reflectRoleToMember(interaction, "48");
   },
+  guildType: "nis",
 };
 
 export default NewbieCommand;

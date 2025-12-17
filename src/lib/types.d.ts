@@ -7,12 +7,13 @@ import {
   CacheType,
   Collection,
 } from "discord.js";
-import { SeatRoleEngine } from "./classes/seat/SeatRoleEngine";
+import { SeatRoleEngine } from "./classes/seat/RoleEngine";
 import { DatabaseEngine } from "./classes/DatabaseEngine";
 
 export interface SlashCommand {
   command: SlashCommandOptionsOnlyBuilder | SlashCommandSubcommandsOnlyBuilder;
   execute: (interaction: ChatInputCommandInteraction) => void;
+  guildType: "recruit" | "nis";
   autocomplete?: (interaction: AutocompleteInteraction) => void;
   modal?: (interaction: ModalSubmitInteraction<CacheType>) => void;
   cooldown?: number;
@@ -22,7 +23,6 @@ declare module "discord.js" {
   export interface Client {
     commands: Collection<string, SlashCommand>;
     seatRoleEngine?: SeatRoleEngine;
-    allowedGuildIds?: string[];
-    ignoredGuildIds?: string[];
+    guildIdMap?: Record<string, string>;
   }
 }

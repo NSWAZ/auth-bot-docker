@@ -15,17 +15,6 @@ interface CommandFile {
 
 export class CommandsHandler {
   static async getCommandsFromDir() {
-    let ignoreCommands: string[] = [];
-
-    if (!process.env.DISCORD_IGNORED_COMMANDS) {
-      log.warn(
-        "DISCORD_IGNORED_COMMANDS is not defined in .env file. Ignoring no commands.",
-      );
-    } else {
-      ignoreCommands = JSON.parse(
-        process.env.DISCORD_IGNORED_COMMANDS,
-      ) as string[];
-    }
 
     const commands = new Collection<string, SlashCommand>();
 
@@ -40,14 +29,10 @@ export class CommandsHandler {
         (await import(`${commandsDir}/${file}`)) as CommandFile
       ).default;
 
-      if (ignoreCommands.includes(command.command.name)) {
-        continue;
-      }
-
       commands.set(command.command.name, command);
     }
 
-    log.info(`Loaded ${commands.size} application (/) commands.`);
+    log.info(`CommandManager: Loaded ${commands.size} application (/) commands.`);
 
     return commands;
   }
@@ -97,12 +82,13 @@ export class CommandsHandler {
     }
 
     try {
-      if (interaction.client.allowedGuildIds && interaction.guildId) {
-        if (!interaction.client.allowedGuildIds.includes(interaction.guildId))
-          return;
-      } else if (interaction.client.ignoredGuildIds && interaction.guildId) {
-        if (interaction.client.ignoredGuildIds.includes(interaction.guildId))
-          return;
+      // guildType에 따라 허용된 길드 ID 확인
+      const allowedGuildId = interaction.client.guildIdMap?.[command.guildType];
+      
+      // 허용된 길드가 아닌 경우 무시
+      if (!allowedGuildId || interaction.guildId !== allowedGuildId) {
+        log.warn(`Command ${command.command.name} executed in unauthorized guild. Expected: ${allowedGuildId}, Got: ${interaction.guildId}`);
+        return;
       }
 
       command.execute(interaction);

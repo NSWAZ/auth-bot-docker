@@ -12,7 +12,7 @@ const NewbieCommand: SlashCommand = {
         .setDescription("뉴비 롤을 부여합니다.")
         .addUserOption((option) =>
           option
-            .setName("targetuser")
+            .setName("target-user")
             .setDescription("뉴비 롤을 부여할 유저")
             .setRequired(true),
         ),
@@ -23,14 +23,14 @@ const NewbieCommand: SlashCommand = {
         .setDescription("뉴비 롤을 제거합니다.")
         .addUserOption((option) =>
           option
-            .setName("targetuser")
+            .setName("target-user")
             .setDescription("뉴비 롤을 제거할 유저")
             .setRequired(true),
         ),
     )
     .setDefaultMemberPermissions(0),
   execute: (interaction) => {
-    DiscordHandler.reflectRoleToMember(interaction, "48");
+    void DiscordHandler.reflectRoleToMember(interaction, "48");
   },
   guildType: "nis",
 };

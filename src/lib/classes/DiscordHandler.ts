@@ -58,36 +58,31 @@ export class DiscordHandler {
   ) {
     await interaction.deferReply();
 
-    const subcommand = interaction.options.getSubcommand();
-    const user = interaction.options.getUser("target-user");
+    const subcommand = interaction.options.getSubcommand(true);
+    const user = interaction.options.getUser("target_user");
 
     if (interaction.guild === null)
       throw new Error("interaction.guild is null.");
     if (user === null) throw new Error("user is null.");
+    
     const member = interaction.guild.members.cache.get(user.id);
     if (member === undefined) throw new Error("member is undefined.");
-    const nickname = member.nickname;
-    if (nickname === null) throw new Error("nickname is null.");
+    
+    const nickname = member.nickname || member.displayName || user.username;
 
     if (interaction.client.seatRoleEngine === undefined)
       throw new Error("SeatRoleEngine is not initd");
 
     if (subcommand === "add") {
-      void interaction.client.seatRoleEngine
-        .add(nickname, seatRoleId)
-        .then(() =>
-          interaction.editReply(
-            `${user.toString()}님에게 뉴비 롤을 부여했습니다.`,
-          ),
-        );
+      await interaction.client.seatRoleEngine.add(nickname, seatRoleId);
+      await interaction.editReply(
+        `${user.toString()}님에게 ${interaction.commandName} 롤을 부여했습니다.`,
+      );
     } else if (subcommand === "remove") {
-      void interaction.client.seatRoleEngine
-        .remove(nickname, seatRoleId)
-        .then(() =>
-          interaction.editReply(
-            `${user.toString()}님에게 뉴비 롤을 제거했습니다.`,
-          ),
-        );
+      await interaction.client.seatRoleEngine.remove(nickname, seatRoleId);
+      await interaction.editReply(
+        `${user.toString()}님에게 ${interaction.commandName} 롤을 제거했습니다.`,
+      );
     }
   }
 

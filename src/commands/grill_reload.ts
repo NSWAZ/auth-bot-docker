@@ -13,7 +13,7 @@ const GrillReloadCommand: SlashCommand = {
     .setDescription("원하는 채널의 불판을 갑니다!")
     .addChannelOption((option) =>
       option
-        .setName("target-channel")
+        .setName("target_channel")
         .setDescription("불판을 갈 채널")
         .setRequired(true)
         .addChannelTypes(ChannelType.GuildText)
@@ -21,7 +21,7 @@ const GrillReloadCommand: SlashCommand = {
     )
     .setDefaultMemberPermissions(0),
   execute: async (interaction) => {
-    const targetChannel = interaction.options.getChannel("target-channel");
+    const targetChannel = interaction.options.getChannel("target_channel");
     if (targetChannel === null) throw Error("목표 채널을 찾을 수 없습니다.");
     if (
       !(

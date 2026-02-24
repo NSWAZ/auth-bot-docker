@@ -12,7 +12,7 @@ import { DatabaseEngine } from "./classes/DatabaseEngine";
 
 export interface SlashCommand {
   command: SlashCommandOptionsOnlyBuilder | SlashCommandSubcommandsOnlyBuilder;
-  execute: (interaction: ChatInputCommandInteraction) => void;
+  execute: (interaction: ChatInputCommandInteraction) => Promise<void>;
   guildType: "recruit" | "nis";
   autocomplete?: (interaction: AutocompleteInteraction) => void;
   modal?: (interaction: ModalSubmitInteraction<CacheType>) => void;

@@ -84,16 +84,16 @@ export class CommandsHandler {
     try {
       // guildType에 따라 허용된 길드 ID 확인
       const allowedGuildId = interaction.client.guildIdMap?.[command.guildType];
-      
+
       // 허용된 길드가 아닌 경우 무시
       if (!allowedGuildId || interaction.guildId !== allowedGuildId) {
         log.warn(`Command ${command.command.name} executed in unauthorized guild. Expected: ${allowedGuildId}, Got: ${interaction.guildId}`);
         return;
       }
 
-      command.execute(interaction);
+      await command.execute(interaction);
     } catch (error) {
-      console.error(error);
+      log.error(`Error executing command ${interaction.commandName}:`, error);
       if (interaction.replied || interaction.deferred) {
         await interaction.followUp({
           content: "There was an error while executing this command!",

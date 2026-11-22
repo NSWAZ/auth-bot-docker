@@ -10,12 +10,11 @@ const { SeatHandler } = require("../dist/lib/classes/seat/Handler");
 const { DiscordHandler } = require("../dist/lib/classes/DiscordHandler");
 
 // Victim: SeAT user 7, Discord 111, main character "Victim Main". Attacker: SeAT user 9, Discord 222.
-const connectorPages = {
-  1: { data: [{ user_id: 7, connector_type: "discord", connector_id: "111", connector_name: "Victim Main" }, { user_id: 8, connector_type: "teamspeak", connector_id: "222", connector_name: "x" }], meta: { current_page: 1, last_page: 2 } },
-  2: { data: [{ user_id: 9, connector_type: "discord", connector_id: "222", connector_name: "Attacker Main" }], meta: { current_page: 2, last_page: 2 } },
-};
+// The custom-plugin lookup answers only the links of the asked Discord ID.
+const LINK_PATH = "/api/v2/custom-plugin/discord-links";
+const defaultLinks = { 111: [{ user_id: 7 }], 222: [{ user_id: 9 }] };
 
-function fakeSeat({ pages = connectorPages, fail } = {}) {
+function fakeSeat({ links = defaultLinks, fail, body } = {}) {
   const calls = [];
   axios.defaults.adapter = async (config) => {
     const url = new URL(config.url);
@@ -23,9 +22,9 @@ function fakeSeat({ pages = connectorPages, fail } = {}) {
     if (fail) {
       throw new axios.AxiosError("Request failed with status code 500", "ERR_BAD_RESPONSE", config, null, { status: 500, statusText: "x", headers: {}, config, data: {} });
     }
-    if (url.pathname === "/api/v2/seat-connector/users") {
-      const page = pages[url.searchParams.get("page")] ?? { data: [], meta: { last_page: 1 } };
-      return { data: page, status: 200, statusText: "OK", headers: {}, config };
+    if (url.pathname === LINK_PATH) {
+      const data = body !== undefined ? body : { data: links[url.searchParams.get("discord_id")] ?? [] };
+      return { data, status: 200, statusText: "OK", headers: {}, config };
     }
     return { data: {}, status: 200, statusText: "OK", headers: {}, config };
   };
@@ -37,7 +36,7 @@ test("the role goes to the SeAT account linked to the target's Discord ID", asyn
   const calls = fakeSeat();
   await new SeatRoleEngine().add("222", "48");
   assert.deepEqual(roleWrites(calls).map((c) => [c.method, c.path, JSON.parse(c.data)]), [["post", "/api/v2/roles/members", { user_id: "9", role_id: "48" }]]);
-  assert.deepEqual(calls.filter((c) => c.method === "get").map((c) => c.search), ["?page=1", "?page=2"]);
+  assert.deepEqual(calls.filter((c) => c.method === "get").map((c) => [c.path, c.search]), [[LINK_PATH, "?discord_id=222"]], "one lookup for the target's Discord ID only");
   assert.ok(calls.every((c) => c.maxRedirects === 0), "the X-TOKEN is never sent on to a redirect");
   const removeCalls = fakeSeat();
   await new SeatRoleEngine().remove("111", "52");
@@ -63,11 +62,11 @@ test("regression: a member who takes another pilot's main name as nickname canno
 });
 
 test("no linked account, or more than one, refuses without changing any role and tells the admin why", async () => {
-  for (const [pages, reason] of [
-    [{ 1: { data: [], meta: { last_page: 1 } } }, /연결된 SeAT 계정이 없습니다/],
-    [{ 1: { data: [{ user_id: 7, connector_type: "discord", connector_id: "333" }, { user_id: 8, connector_type: "discord", connector_id: "333" }], meta: { last_page: 1 } } }, /2개/],
+  for (const [links, reason] of [
+    [{}, /연결된 SeAT 계정이 없습니다/],
+    [{ 333: [{ user_id: 7 }, { user_id: 8 }] }, /2개/],
   ]) {
-    const calls = fakeSeat({ pages });
+    const calls = fakeSeat({ links });
     await assert.rejects(new SeatRoleEngine().add("333", "48"), (error) => error instanceof SeatLookupError && reason.test(error.message));
     assert.equal(roleWrites(calls).length, 0);
 
@@ -84,13 +83,6 @@ test("no linked account, or more than one, refuses without changing any role and
   }
 });
 
-test("connector paging stops at last_page even if SeAT keeps answering", async () => {
-  const endless = new Proxy({}, { get: (_t, page) => ({ data: [], meta: { current_page: Number(page), last_page: 3 } }) });
-  const calls = fakeSeat({ pages: endless });
-  await assert.rejects(new SeatRoleEngine().add("444", "48"), SeatLookupError);
-  assert.equal(calls.length, 3);
-});
-
 test("a failed SeAT request reports method, path and status, never the X-TOKEN", async () => {
   fakeSeat({ fail: true });
   const error = await SeatHandler.addUserRole("9", "48").catch((e) => e);
@@ -98,13 +90,6 @@ test("a failed SeAT request reports method, path and status, never the X-TOKEN",
   const dump = JSON.stringify(error, Object.getOwnPropertyNames(error)) + String(error.stack) + String(error.cause ?? "");
   assert.ok(!dump.includes("seat-token-do-not-leak"));
   assert.equal(error.config, undefined);
-});
-
-test("more connector pages than the cap refuses instead of deciding on a partial list", async () => {
-  const endless = new Proxy({}, { get: (_t, page) => ({ data: Number(page) === 1 ? [{ user_id: 9, connector_type: "discord", connector_id: "222" }] : [], meta: { current_page: Number(page), last_page: 250 } }) });
-  const calls = fakeSeat({ pages: endless });
-  await assert.rejects(new SeatRoleEngine().add("222", "48"), (error) => error instanceof SeatLookupError && /끝까지 확인하지 못해/.test(error.message));
-  assert.equal(roleWrites(calls).length, 0);
 });
 
 test("a failed SeAT request tells the admin the role was not changed and why, without the token", async () => {
@@ -140,15 +125,54 @@ test("SeAT requests have a time limit; a timed-out lookup changes no role", asyn
   assert.match(String(replies.at(-1)), /바꾸지 않았습니다.*no response/);
 });
 
-test("the whole connector lookup has a time limit; past it no role changes", async () => {
-  const calls = fakeSeat({ pages: new Proxy({}, { get: (_t, page) => ({ data: [], meta: { current_page: Number(page), last_page: 50 } }) }) });
-  const slow = axios.defaults.adapter;
-  axios.defaults.adapter = async (config) => { await new Promise((r) => setTimeout(r, 15)); return slow(config); };
-  const previous = SeatRoleEngine.lookupDeadlineMs;
-  SeatRoleEngine.lookupDeadlineMs = 40;
-  try {
-    await assert.rejects(new SeatRoleEngine().add("222", "48"), (error) => error instanceof SeatLookupError && /제한 시간/.test(error.message));
-  } finally { SeatRoleEngine.lookupDeadlineMs = previous; }
-  assert.ok(calls.length < 50, `stopped early after ${calls.length} pages`);
-  assert.equal(roleWrites(calls).length, 0);
+test("regression: links without a usable SeAT user ID (null, text, zero) refuse instead of writing a role", async () => {
+  // seat-connector 3.1.2 answered every link with user_id null; that must never become a role write.
+  for (const body of [
+    { data: [{ user_id: null }] },
+    { data: [{ user_id: "7" }] },
+    { data: [{ user_id: 0 }] },
+    { data: [{ user_id: 7.5 }] },
+    { data: [null] },
+  ]) {
+    const calls = fakeSeat({ body });
+    await assert.rejects(new SeatRoleEngine().add("111", "48"), (error) => error instanceof SeatLookupError && /올바른 SeAT 사용자 ID가 없어/.test(error.message), JSON.stringify(body));
+    assert.equal(roleWrites(calls).length, 0, JSON.stringify(body));
+  }
+});
+
+test("regression: an answer without a link list is a broken answer, not 'no linked account'", async () => {
+  // Telling the admin "link Discord in SeAT first" for a broken API answer would send them the wrong way.
+  for (const body of [{ data: null }, {}, { data: "x" }, { data: { user_id: 7 } }, "<!doctype html>", null]) {
+    const calls = fakeSeat({ body });
+    await assert.rejects(
+      new SeatRoleEngine().add("111", "48"),
+      (error) => error instanceof SeatLookupError && /응답 형식이 올바르지 않아/.test(error.message) && !/연결된 SeAT 계정이 없습니다/.test(error.message),
+      JSON.stringify(body),
+    );
+    assert.equal(roleWrites(calls).length, 0, JSON.stringify(body));
+  }
+});
+
+test("the lookup carries the SeAT token in X-TOKEN, never in the URL", async () => {
+  const seen = [];
+  axios.defaults.adapter = async (config) => {
+    seen.push({ url: config.url, token: config.headers["X-TOKEN"] });
+    return { data: { data: [{ user_id: 9 }] }, status: 200, statusText: "OK", headers: {}, config };
+  };
+  assert.equal(await new SeatRoleEngine().getSeatUserIdByDiscordId("222"), "9");
+  assert.deepEqual(seen, [{ url: "https://seat.nisuwaz.com/api/v2/custom-plugin/discord-links?discord_id=222", token: "seat-token-do-not-leak" }]);
+});
+
+test("the same SeAT user listed twice for one Discord ID is still one account", async () => {
+  const calls = fakeSeat({ links: { 111: [{ user_id: 7 }, { user_id: 7 }] } });
+  await new SeatRoleEngine().add("111", "48");
+  assert.deepEqual(roleWrites(calls).map((c) => JSON.parse(c.data).user_id), ["7"]);
+});
+
+test("a malformed Discord ID is refused before any SeAT request", async () => {
+  for (const id of ["", "12a", "1".repeat(21), "1&discord_id=2"]) {
+    const calls = fakeSeat();
+    await assert.rejects(new SeatRoleEngine().add(id, "48"), SeatLookupError);
+    assert.equal(calls.length, 0, id);
+  }
 });

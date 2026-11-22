@@ -4,7 +4,7 @@ NIS와 리크루트 두 Discord 길드를 함께 맡는 봇(v4)의 Docker 이미
 
 ## 기능
 
-- NIS 길드: `/newbie`, `/inactive`(SeAT 역할 부여·제거), `/grill_reload`(채널 복사 후 아카이브 이동), `안내` 채널 안내 메시지
+- NIS 길드: `/newbie`, `/inactive`(SeAT 역할 부여·제거, 대상 멤버의 Discord ID에 연결된 SeAT 계정만 씀), `/grill_reload`(채널 복사 후 아카이브 이동), `안내` 채널 안내 메시지
 - 리크루트 길드: 가입·기타 문의 상담 흐름, `가입-안내` 채널 안내 메시지, `/상담완료`
 - `/상담완료`: 상담 채널을 보관소(intel-archive)에 보관하고 POST·GET 응답을 대조해 검증한 뒤 **채널을 삭제**합니다. 검증되지 않으면 채널을 지우지 않습니다. 이미 보관된 채널(409)은 `by-channel` 조회로 기존 보관본을 확인한 뒤 삭제하며, 보관 이후 쓰인 새 메시지 수를 담당자에게 알립니다(내용은 남기지 않음).
 - 안내 메시지는 봇 자신이 쓴 메시지만 교체합니다.
@@ -33,6 +33,11 @@ NIS와 리크루트 두 Discord 길드를 함께 맡는 봇(v4)의 Docker 이미
 Portainer Stack 편집기에서는 위 경로만 설정하지 말고, 각 Secret을 Stack 최상위에서 `external: true`로 선언한 뒤 auth-bot 서비스의 `secrets` 목록에도 연결해야 합니다. 실제 Stack 파일은 Portainer에서 관리하며 이 저장소에는 두지 않습니다.
 
 직접 환경변수인 `DISCORD_TOKEN`, `SEAT_TOKEN`, `INTEL_ARCHIVE_TOKEN`도 지원하지만, 같은 이름의 직접 값과 `_FILE`이 모두 있으면 직접 값이 우선합니다. 실제 Secret 값, 밴 목록 파일과 `.env` 파일은 Git에 넣지 않습니다. 로컬 개발용 예시는 `.env.example`에 있습니다.
+
+## SeAT 쪽 요구 사항
+
+- `/newbie`·`/inactive`는 SeAT 계정을 [seat-custom-plugin](https://github.com/goemktg/seat-custom-plugin)의 `GET /api/v2/custom-plugin/discord-links?discord_id=<ID>`로 찾습니다. 그 플러그인이 설치된 SeAT가 필요합니다. seat-connector 자체 API(`/api/v2/seat-connector/users`)는 SeAT 5용 3.1.2에서 모든 값을 비워서 돌려주므로 쓰지 않습니다.
+- `SEAT_TOKEN`은 SeAT API 토큰이며, 봇이 나가는 IP가 그 토큰의 허용 IP에 들어 있어야 합니다.
 
 ## v3.0.2에서 넘어갈 때
 

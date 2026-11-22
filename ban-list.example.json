@@ -1,0 +1,10 @@
+{
+  "categories": [
+    {
+      "label": "예시 밴 분류",
+      "char": ["Example Pilot One", "Example Pilot Two"],
+      "corp": ["Example Corporation"],
+      "alli": ["EXAMPLE"]
+    }
+  ]
+}

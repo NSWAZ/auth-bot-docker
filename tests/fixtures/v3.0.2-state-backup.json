@@ -1,0 +1,20 @@
+{
+  "timestamp": "2026-02-24T00:00:00.000Z",
+  "sessions": {
+    "200000000000000002": {
+      "status": "active",
+      "context": {
+        "mainCharacterId": "90000001",
+        "mainCharacterName": "Example Pilot",
+        "recruitRoute": null,
+        "recruitType": "NIS",
+        "termsAgreed": 0,
+        "skipStateChangeMessage": false
+      },
+      "value": "checkingConditions",
+      "children": {},
+      "historyValue": {},
+      "tags": []
+    }
+  }
+}

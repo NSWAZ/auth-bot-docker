@@ -93,13 +93,17 @@ export class SeatHandler {
   }
 
   /**
-   * SeAT Connector(seat-connector 플러그인)의 사용자↔커넥터 연결 목록 한 페이지를 가져옵니다.
-   * GET /api/v2/seat-connector/users: user_id, connector_type("discord"), connector_id(Discord 사용자 ID)
+   * Discord 사용자 ID에 연결된 SeAT 사용자 목록을 가져옵니다(seat-custom-plugin의 조회 API).
+   * GET /api/v2/custom-plugin/discord-links?discord_id=<id>: { data: [{ user_id }] }
+   * seat-connector 자체 API(/seat-connector/users)는 SeAT 5용 3.1.2에서 모든 값을 null로 돌려주어 쓰지 않습니다.
    */
-  static async getConnectorUsers(
-    page = 1,
-  ): Promise<APIGetSeatConnectorUsersResponse> {
-    return this.request("get", `/seat-connector/users?page=${page}`);
+  static async getDiscordLinks(
+    discordUserId: string,
+  ): Promise<APIGetDiscordLinksResponse> {
+    return this.request(
+      "get",
+      `/custom-plugin/discord-links?discord_id=${encodeURIComponent(discordUserId)}`,
+    );
   }
 
   /**
@@ -133,16 +137,13 @@ export class SeatHandler {
   }
 }
 
-export interface SeatConnectorUser {
-  user_id: number;
-  connector_type: string;
-  connector_id: string;
-  connector_name?: string;
+export interface SeatDiscordLink {
+  user_id: unknown;
 }
 
-export interface APIGetSeatConnectorUsersResponse {
-  data: SeatConnectorUser[];
-  meta?: { current_page?: number; last_page?: number };
+/** The documented answer; RoleEngine still checks every field, since the body is not trusted. */
+export interface APIGetDiscordLinksResponse {
+  data: SeatDiscordLink[];
 }
 
 interface seatEntity {

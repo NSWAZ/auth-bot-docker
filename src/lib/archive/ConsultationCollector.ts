@@ -46,6 +46,17 @@ const json = (value: any): any =>
   value?.toJSON ? value.toJSON() : (value ?? null);
 const values = (collection: any): any[] =>
   collection ? Array.from(collection.values?.() ?? collection) : [];
+/**
+ * Permission overwrites as `{ [overwrite id]: overwrite }`. The archive stores this as a JSON object,
+ * and a discord.js Collection's toJSON() is an array, so the cache cannot be passed through json().
+ */
+const permissionSnapshot = (channel: any): Record<string, unknown> =>
+  Object.fromEntries(
+    values(channel.permissionOverwrites?.cache).map((overwrite: any) => [
+      overwrite.id,
+      json(overwrite),
+    ]),
+  );
 /** Query and fragment removed: the form used for identity and for owner references, never for downloading. */
 const safeUrl = (value: string): string => {
   const url = new URL(value);
@@ -559,6 +570,7 @@ export async function collectConsultation(
     omitted,
   );
   const now = new Date().toISOString();
+  const snapshot = permissionSnapshot(channel);
   return {
     schema_version: 2,
     discord_guild_id: channel.guild.id,
@@ -592,10 +604,10 @@ export async function collectConsultation(
       category: json(channel.parent),
       thread_metadata: null,
       forum_metadata: null,
-      permission_snapshot: json(channel.permissionOverwrites.cache),
+      permission_snapshot: snapshot,
       raw: json(channel),
     },
-    permission_snapshot: json(channel.permissionOverwrites.cache),
+    permission_snapshot: snapshot,
     raw_snapshot: {
       source: "recruit-bot",
       cutoff_captured_before_fetch: cutoff.id,

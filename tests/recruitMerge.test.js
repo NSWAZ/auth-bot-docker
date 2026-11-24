@@ -29,35 +29,55 @@ function consultationChannel({ after = [], fetchFails = false, deleteFails = fal
 function recruiter(events) {
   return { user: { id: "600", send: async (text) => events.push(`dm:${text}`) }, editReply: async ({ content }) => events.push(`reply:${content}`) };
 }
+/** The recruiters' channel (리크루터-working) where the completion notice goes instead of a DM. */
+function noticeChannel(events, { fails = false } = {}) {
+  return { send: async (message) => { events.push(`notice:${message.content}|mentions:${JSON.stringify(message.allowedMentions)}`); if (fails) throw new Error("Missing Access"); } };
+}
 const verified = { archive_id: "archive-1", cutoff_message_id: "401" };
 
 test("verified archive: the recruiter is told how many unarchived human messages go with the channel, then it is deleted", async () => {
   const channel = consultationChannel({ after: [human("402"), botMessage("403"), human("404")] });
-  await deleteArchivedConsultation(recruiter(channel.events), channel, verified);
+  await deleteArchivedConsultation(recruiter(channel.events), channel, verified, () => noticeChannel(channel.events));
   const notice = consultationDeletionNotice("alice-recruit", "archive-1", 2);
   assert.match(notice, /새 메시지 2개/);
-  assert.deepEqual(channel.events, ["fetch:after=401", `reply:${notice}`, `dm:${notice}`, "delete"]);
+  // No DM: the notice goes to the recruiters' channel, naming who completed it without pinging anyone.
+  assert.deepEqual(channel.events, ["fetch:after=401", `reply:${notice}`, `notice:${notice} (처리: <@600>)|mentions:{"parse":[]}`, "delete"]);
   assert.ok(!notice.includes("human 402"), "message content is never repeated");
+});
+
+test("without a reachable recruiters' channel nobody is DMed and the channel is still deleted", async () => {
+  const missing = consultationChannel();
+  await deleteArchivedConsultation(recruiter(missing.events), missing, verified, () => null);
+  assert.ok(!missing.events.some((e) => e.startsWith("dm:")));
+  assert.equal(missing.events.at(-1), "delete");
+  const failing = consultationChannel();
+  await deleteArchivedConsultation(recruiter(failing.events), failing, verified, () => noticeChannel(failing.events, { fails: true }));
+  assert.ok(!failing.events.some((e) => e.startsWith("dm:")));
+  assert.equal(failing.events.at(-1), "delete");
+  // Even a lookup that throws does not stop the deletion.
+  const throwing = consultationChannel();
+  await deleteArchivedConsultation(recruiter(throwing.events), throwing, verified, () => { throw new Error("cache"); });
+  assert.equal(throwing.events.at(-1), "delete");
 });
 
 test("with nothing after the cutoff the notice does not mention lost messages", async () => {
   const channel = consultationChannel();
-  await deleteArchivedConsultation(recruiter(channel.events), channel, verified);
+  await deleteArchivedConsultation(recruiter(channel.events), channel, verified, () => noticeChannel(channel.events));
   assert.ok(!channel.events[1].includes("새 메시지"));
   assert.equal(channel.events.at(-1), "delete");
 });
 
-test("a failed DM or reply does not stop the deletion; a failed count or delete is a MutationError with the channel left", async () => {
+test("a failed notice or reply does not stop the deletion; a failed count or delete is a MutationError with the channel left", async () => {
   const channel = consultationChannel();
-  await deleteArchivedConsultation({ user: { id: "600", send: async () => { throw new Error("DMs closed"); } }, editReply: async () => { throw new Error("gone"); } }, channel, verified);
+  await deleteArchivedConsultation({ user: { id: "600" }, editReply: async () => { throw new Error("gone"); } }, channel, verified, () => noticeChannel(channel.events, { fails: true }));
   assert.equal(channel.events.at(-1), "delete");
 
   const counting = consultationChannel({ fetchFails: true });
-  await assert.rejects(deleteArchivedConsultation(recruiter(counting.events), counting, verified), /지우지 않았습니다/);
+  await assert.rejects(deleteArchivedConsultation(recruiter(counting.events), counting, verified, () => null), /지우지 않았습니다/);
   assert.ok(!counting.events.includes("delete"));
 
   const deleting = consultationChannel({ deleteFails: true });
-  await assert.rejects(deleteArchivedConsultation(recruiter(deleting.events), deleting, verified), /채널 삭제에 실패/);
+  await assert.rejects(deleteArchivedConsultation(recruiter(deleting.events), deleting, verified, () => null), /채널 삭제에 실패/);
   assert.match(archiveFailureMessage("#x", new MutationError("채널 삭제에 실패했습니다.")), /채널은 남아 있습니다/);
 });
 
@@ -69,7 +89,7 @@ test("no channel deletion on any archive failure", async () => {
   ];
   for (const dependencies of failing) {
     const channel = consultationChannel();
-    await assert.rejects(archiveVerifyThenMutate({}, channel, dependencies, (archive) => deleteArchivedConsultation(recruiter(channel.events), channel, archive)), (error) => error instanceof ArchiveError);
+    await assert.rejects(archiveVerifyThenMutate({}, channel, dependencies, (archive) => deleteArchivedConsultation(recruiter(channel.events), channel, archive, () => null)), (error) => error instanceof ArchiveError);
     assert.deepEqual(channel.events, []);
   }
 });
@@ -141,4 +161,13 @@ test("ban list: read from BAN_LIST_FILE; missing gives an empty list, malformed 
 test("the repository carries no ban list data", () => {
   const data = fs.readFileSync(path.join(__dirname, "..", "src", "static", "data.ts"), "utf8");
   assert.ok(!/banData|evegall|char:\s*\[/.test(data));
+});
+
+test("the completion notice channel is the guild's text channel named 리크루터-working", () => {
+  const { findRecruiterNoticeChannel, RECRUITER_NOTICE_CHANNEL_NAME } = require("../dist/lib/classes/DiscordHandler");
+  assert.equal(RECRUITER_NOTICE_CHANNEL_NAME, require("../dist/static/data").recruiterChannelNames.NIS);
+  const working = { type: 0, name: "리크루터-working", send: async () => {} };
+  const guild = (channels) => ({ channels: { cache: { find: (fn) => channels.find(fn) } } });
+  assert.equal(findRecruiterNoticeChannel(guild([{ type: 2, name: "리크루터-working" }, working])), working);
+  assert.equal(findRecruiterNoticeChannel(guild([{ type: 0, name: "웜홀-해병트럭" }])), null);
 });

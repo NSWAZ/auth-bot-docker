@@ -194,9 +194,39 @@ export function consultationDeletionNotice(
   return `#${displaySafe(channelName, 100)} 상담 보관이 검증되었습니다(보관 ID ${displaySafe(archiveId, 100)}). 채널을 삭제합니다.${lost}`;
 }
 
+/** Where the /상담완료 completion notice is posted for the recruiters (it used to be a DM). */
+export interface NoticeChannel {
+  send(message: MessageCreateOptions): Promise<unknown>;
+}
+
 /**
- * /상담완료 after a verified archive: tell the recruiter (in the reply, and by DM because the
- * reply disappears with the channel), log it without message content, then delete the channel.
+ * The recruiters' channel name: recruiterChannelNames.NIS in static/data.ts, which imports this
+ * module and so cannot be imported here (a test keeps the two equal).
+ */
+export const RECRUITER_NOTICE_CHANNEL_NAME = "리크루터-working";
+
+/** The recruiters' channel (리크루터-working) of the consultation's guild, if the bot can see it. */
+export function findRecruiterNoticeChannel(guild: {
+  channels: {
+    cache: {
+      find(
+        fn: (channel: { type?: unknown; name?: unknown }) => boolean,
+      ): unknown;
+    };
+  };
+}): NoticeChannel | null {
+  const found = guild.channels.cache.find(
+    (channel) =>
+      channel?.type === ChannelType.GuildText &&
+      channel.name === RECRUITER_NOTICE_CHANNEL_NAME,
+  );
+  return (found as NoticeChannel | undefined) ?? null;
+}
+
+/**
+ * /상담완료 after a verified archive: tell the recruiter (in the reply, and in the recruiters'
+ * channel because the reply disappears with the channel), log it without message content, then
+ * delete the channel.
  */
 export async function deleteArchivedConsultation(
   interaction: Pick<ChatInputCommandInteraction, "editReply" | "user">,
@@ -206,6 +236,8 @@ export async function deleteArchivedConsultation(
     delete(reason?: string): Promise<unknown>;
   },
   verified: Pick<ArchiveResponse, "archive_id" | "cutoff_message_id">,
+  /** Looked up only here, inside the notice's own error handling: it can never stop the deletion. */
+  findNoticeChannel: () => NoticeChannel | null,
 ): Promise<void> {
   const unarchived = await countUnarchivedHumanMessages(
     channel,
@@ -225,10 +257,22 @@ export async function deleteArchivedConsultation(
     log.warn("상담완료: 삭제 전 안내를 채널에 남기지 못했습니다.", error);
   }
   try {
-    await interaction.user.send(notice);
-  } catch {
+    const noticeChannel = findNoticeChannel();
+    if (!noticeChannel) {
+      log.warn(
+        `상담완료: ${RECRUITER_NOTICE_CHANNEL_NAME} 채널을 찾지 못해 완료 안내를 남기지 않았습니다.`,
+      );
+    } else {
+      // Names who completed it; the mention renders the name but pings nobody.
+      await noticeChannel.send({
+        content: `${notice} (처리: <@${interaction.user.id}>)`,
+        allowedMentions: { parse: [] },
+      });
+    }
+  } catch (error) {
     log.warn(
-      `상담완료: 담당자 ${interaction.user.id}에게 DM을 보내지 못했습니다.`,
+      `상담완료: ${RECRUITER_NOTICE_CHANNEL_NAME} 채널에 완료 안내를 남기지 못했습니다.`,
+      error,
     );
   }
   try {
@@ -593,7 +637,9 @@ export class DiscordHandler {
           client: new ArchiveClient(loadArchiveConfig()),
         },
         (verified) =>
-          deleteArchivedConsultation(interaction, targetChannel, verified),
+          deleteArchivedConsultation(interaction, targetChannel, verified, () =>
+            findRecruiterNoticeChannel(targetChannel.guild),
+          ),
       );
     } catch (error) {
       const kind =

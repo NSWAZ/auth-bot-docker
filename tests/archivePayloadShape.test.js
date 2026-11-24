@@ -81,3 +81,18 @@ test("payload JsonObject fields are plain objects; permission snapshots are keye
     await client.destroy();
   }
 });
+
+test("an applicant who left the server is archived from their user, marked as gone", async () => {
+  const { client, consult, interaction } = buildConsultation();
+  // Left the server: the member lookup fails, the user (seen through the message author) remains.
+  consult.guild.members.fetch = async () => { throw Object.assign(new Error("Unknown Member"), { code: 10007 }); };
+  try {
+    const payload = await collectConsultation(interaction, consult, { policy: { hosts: [], mimeTypes: [], maxAttachmentBytes: 1 }, fetchImpl: async () => { throw new Error("no network"); } });
+    assert.equal(payload.applicant_discord_id, "301");
+    assert.equal(payload.applicant_display_name, "dummyapplicant (서버 나감)");
+    assert.deepEqual(payload.raw_snapshot.applicant, { in_guild: false, evidence: ["permission", "messages"] });
+    assert.equal(payload.participants.find((p) => p.discord_user_id === "301").role, "applicant");
+  } finally {
+    await client.destroy();
+  }
+});

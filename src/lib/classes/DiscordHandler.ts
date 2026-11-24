@@ -27,8 +27,10 @@ export function archiveFailureMessage(
   channelLabel: string,
   error: unknown,
 ): string {
+  // Long enough for the applicant candidates a collection failure lists (Discord allows 2000 characters).
   const reason = displaySafe(
     error instanceof Error ? error.message : "알 수 없는 오류",
+    900,
   );
   if (error instanceof MutationError)
     return `${channelLabel} 보관은 검증되었지만 채널을 지우지 못했습니다. 채널은 남아 있습니다. ${reason}`;
@@ -606,6 +608,8 @@ export class DiscordHandler {
       await interaction.editReply({
         content: archiveFailureMessage(targetChannelName, error),
         components: [],
+        // The reason can carry Discord display names: never let one ping anybody.
+        allowedMentions: { parse: [] },
       });
     }
   }

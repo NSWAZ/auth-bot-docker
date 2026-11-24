@@ -101,15 +101,15 @@ test("collector emits and deduplicates attachment/avatar/emoji/sticker/embed med
   assert.ok(assets.every((a) => a.size === 14 && a.owner_reference));
 });
 
-test("applicant uses authoritative state or requires exactly one eligible overwrite", async () => {
+test("applicant uses authoritative state or narrows to exactly one eligible overwrite", async () => {
   const applicant = { id: "300", user: { bot: false }, roles: { cache: new Map() } };
   const recruiter = { id: "600", user: { bot: false }, roles: { cache: new Map([["r", { name: "리크루터" }]]) } };
   const members = new Map([["300", applicant], ["301", { ...applicant, id: "301" }], ["600", recruiter]]);
   const channel = { guild: { members: { fetch: async (id) => members.get(id) } }, permissionOverwrites: { cache: new Map([["a", { type: 1, id: "300" }], ["r", { type: 1, id: "600" }]]) } };
-  assert.equal((await resolveApplicant({ user: { id: "600" } }, channel, { context: { applicantDiscordId: "301" } })).id, "301");
-  assert.equal((await resolveApplicant({ user: { id: "600" } }, channel, null)).id, "300");
+  assert.equal((await resolveApplicant({ user: { id: "600" } }, channel, { context: { applicantDiscordId: "301" } }, [])).id, "301");
+  assert.equal((await resolveApplicant({ user: { id: "600" } }, channel, null, [])).id, "300");
   channel.permissionOverwrites.cache.set("b", { type: 1, id: "301" });
-  await assert.rejects(resolveApplicant({ user: { id: "600" } }, channel, null), /eligible=2/);
+  await assert.rejects(resolveApplicant({ user: { id: "600" } }, channel, null, []), /후보 2명/);
 });
 
 test("confirmation nonce binds initiator, prompt message and channel", () => {

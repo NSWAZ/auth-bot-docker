@@ -407,45 +407,254 @@ export async function collectDownloadableAssets(
   ];
 }
 
+/** What placed someone as the applicant; listed in the archive's raw_snapshot.applicant. */
+export type ApplicantEvidence =
+  | "state"
+  | "option"
+  | "permission"
+  | "messages"
+  | "channel_name";
+
+/** The applicant of a consultation. A member if still in the server; otherwise their Discord user. */
+export interface ResolvedApplicant {
+  id: string;
+  displayName: string;
+  inGuild: boolean;
+  evidence: ApplicantEvidence[];
+}
+
+/** The /상담완료 option that names the applicant when the channel alone cannot. */
+export const APPLICANT_OPTION = "지원자";
+const MAX_LISTED = 5;
+/** Discord API error codes for a user who is not in the guild / does not exist. */
+const UNKNOWN_MEMBER = 10007;
+const UNKNOWN_USER = 10013;
+
+const isRecruiter = (member: any): boolean =>
+  values(member?.roles?.cache).some((role: any) =>
+    String(role.name).includes("리크루터"),
+  );
+/** Letters and digits only: channel names drop or replace what usernames may contain (".", "#"). */
+const comparable = (text: string): string =>
+  text.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+/** The username a consultation channel was created for: `<tag>-recruit` or `<tag>-daehwa`, maybe renamed with a suffix. */
+const channelOwnerName = (name: unknown): string | null => {
+  if (typeof name !== "string") return null;
+  const match = /^(.+)-(?:recruit|daehwa)(?:[_-].*)?$/.exec(name);
+  return match ? comparable(match[1]) : null;
+};
+
+interface Person {
+  id: string;
+  member: any;
+  user: any;
+  overwrite: boolean;
+  authored: boolean;
+}
+const personName = (person: Person): string =>
+  displaySafe(
+    String(
+      person.member?.displayName ??
+        person.user?.globalName ??
+        person.user?.username ??
+        person.id,
+    ),
+    40,
+  ) || person.id;
+const asApplicant = (
+  person: Person,
+  evidence: ApplicantEvidence[],
+): ResolvedApplicant => ({
+  id: person.id,
+  displayName: personName(person),
+  inGuild: Boolean(person.member),
+  evidence,
+});
+
+/**
+ * The applicant, in this order: the recruit state; the 지원자 option; otherwise the people of the channel
+ * (member overwrites and message authors, without bots, webhooks and the commander). The bot gives a member
+ * overwrite only to the applicant, so non-recruiters with one come first, then non-recruiter authors; several
+ * are narrowed by who talked and by the name the channel was created with. Someone who now has a recruiter
+ * role counts only when the channel name is theirs (an applicant who became a recruiter). A member who left the
+ * server is still found from their user; their roles are unknown. Anything but exactly one fails closed.
+ */
 export async function resolveApplicant(
   interaction: any,
   channel: any,
   state: any,
-): Promise<any> {
+  messages: any[],
+): Promise<ResolvedApplicant> {
+  // Only Discord's "unknown" answers mean someone is not there; any other failure (network, 429, 5xx)
+  // stops the archive, or a recruiter who could not be read would count as someone who left.
+  const lookup = async (fetching: () => Promise<any>, unknownCode: number) => {
+    try {
+      return (await fetching()) ?? null;
+    } catch (error) {
+      if ((error as { code?: unknown } | null)?.code === unknownCode)
+        return null;
+      throw new ArchiveError(
+        "collection",
+        "Discord에서 채널 참가자 정보를 읽지 못했습니다. 잠시 후 다시 시도해 주세요.",
+        { cause: error },
+      );
+    }
+  };
+  const fetchMember = (id: string) =>
+    lookup(() => channel.guild.members.fetch(id), UNKNOWN_MEMBER);
+  const users = channel.client?.users ?? interaction.client?.users;
+  const fetchUser = (id: string) =>
+    users ? lookup(() => users.fetch(id), UNKNOWN_USER) : null;
+  const authors = new Map<string, any>();
+  for (const message of messages)
+    if (message?.author?.id && !message.webhookId)
+      authors.set(message.author.id, message.author);
+  const overwriteIds = new Set<string>(
+    values(channel.permissionOverwrites?.cache)
+      .filter((item: any) => item.type === 1)
+      .map((item: any) => String(item.id)),
+  );
+  const personFor = async (id: string): Promise<Person | null> => {
+    const member = await fetchMember(id);
+    const user = member?.user ?? authors.get(id) ?? (await fetchUser(id));
+    if (!member && !user) return null;
+    return {
+      id,
+      member,
+      user,
+      overwrite: overwriteIds.has(id),
+      authored: authors.has(id),
+    };
+  };
+  const supported = (person: Person): ApplicantEvidence[] => [
+    ...(person.overwrite ? (["permission"] as const) : []),
+    ...(person.authored ? (["messages"] as const) : []),
+  ];
+
+  const picked = interaction.options?.getUser?.(APPLICANT_OPTION, false);
   const stateApplicantId = state?.context?.applicantDiscordId;
   if (stateApplicantId) {
-    const member = await channel.guild.members
-      .fetch(stateApplicantId)
-      .catch(() => null);
-    if (!member || member.user?.bot)
-      throw new Error("지원자 정보를 Discord에서 확인할 수 없습니다.");
-    return member;
-  }
-  const eligible: any[] = [];
-  for (const overwrite of values(channel.permissionOverwrites.cache).filter(
-    (item: any) => item.type === 1,
-  )) {
-    const member = await channel.guild.members
-      .fetch(overwrite.id)
-      .catch(() => null);
-    const recruiter =
-      member?.roles?.cache &&
-      values(member.roles.cache).some((role: any) =>
-        String(role.name).includes("리크루터"),
+    if (picked && picked.id !== String(stateApplicantId))
+      throw new ArchiveError(
+        "collection",
+        "지정한 지원자가 상담 상태의 지원자와 다릅니다. 지원자 옵션 없이 다시 실행해 주세요.",
       );
-    if (
-      member &&
-      !member.user?.bot &&
-      member.id !== interaction.user.id &&
-      !recruiter
-    )
-      eligible.push(member);
+    const person = await personFor(String(stateApplicantId));
+    if (!person || person.user?.bot || person.user?.system)
+      throw new ArchiveError(
+        "collection",
+        "지원자 정보를 Discord에서 확인할 수 없습니다.",
+      );
+    return asApplicant(person, ["state"]);
   }
-  if (eligible.length !== 1)
-    throw new Error(
-      `지원자 권한 대상을 하나로 확정할 수 없습니다 (eligible=${eligible.length}).`,
+  if (picked) {
+    const id = String(picked.id);
+    const fail = (reason: string) =>
+      new ArchiveError(
+        "collection",
+        `지정한 지원자를 쓸 수 없습니다: ${reason}`,
+      );
+    if (picked.bot) throw fail("봇입니다.");
+    if (id === interaction.user.id) throw fail("명령을 실행한 사람입니다.");
+    const person = await personFor(id);
+    if (!person || !(person.overwrite || person.authored))
+      throw fail("이 채널에 권한도 대화 기록도 없습니다.");
+    return asApplicant(person, ["option", ...supported(person)]);
+  }
+
+  const people: Person[] = [];
+  const excluded: string[] = [];
+  for (const id of new Set([...overwriteIds, ...authors.keys()])) {
+    if (id === interaction.user.id) continue;
+    const person = await personFor(id);
+    if (!person) {
+      // An author is always known from the message itself, so only an overwrite gets here.
+      excluded.push(`${id}(Discord에서 찾을 수 없음)`);
+      continue;
+    }
+    if (person.user?.bot || person.user?.system) continue;
+    people.push(person);
+  }
+  const hint = `\`/상담완료 ${APPLICANT_OPTION}:\`로 지원자를 직접 지정해 주세요.`;
+  // An overwrite is given only to the applicant: one that cannot be read may be the applicant's.
+  if (excluded.length)
+    throw new ArchiveError(
+      "collection",
+      `개인 권한 대상 중 Discord에서 확인할 수 없는 사람이 있어 지원자를 정하지 않았습니다: ${excluded.slice(0, MAX_LISTED).join(", ")}. ${hint}`,
     );
-  return eligible[0];
+  const ownerName = channelOwnerName(channel.name);
+  const namedByChannel = (person: Person) =>
+    ownerName !== null &&
+    [person.user?.username, person.user?.tag].some(
+      (name) => typeof name === "string" && comparable(name) === ownerName,
+    );
+  const recruiters = people.filter((person) => isRecruiter(person.member));
+  const others = people.filter((person) => !isRecruiter(person.member));
+  // The bot gives a member overwrite only to the applicant, so those come before mere authors.
+  const tiers = [
+    others.filter((person) => person.overwrite),
+    others.filter((person) => person.authored),
+  ];
+  const describe = (person: Person, why: string[]) =>
+    `${personName(person)}(${person.id}, ${why.join("·")})`;
+  const label = (person: Person) =>
+    describe(person, [
+      ...(person.overwrite ? ["권한"] : []),
+      ...(person.authored ? ["대화"] : []),
+      ...(person.member ? [] : ["서버 나감"]),
+    ]);
+  const listed = (items: string[]) =>
+    items.length > MAX_LISTED
+      ? `${items.slice(0, MAX_LISTED).join(", ")} 외 ${items.length - MAX_LISTED}명`
+      : items.join(", ");
+
+  for (const tier of tiers) {
+    if (tier.length === 0) continue;
+    let narrowed = tier;
+    if (narrowed.length > 1) {
+      const talked = narrowed.filter((person) => person.authored);
+      if (talked.length >= 1) narrowed = talked;
+    }
+    if (narrowed.length > 1) {
+      const named = narrowed.filter(namedByChannel);
+      if (named.length === 1) narrowed = named;
+    }
+    // Someone who left has no roles to read: from their messages alone they may as well be a recruiter
+    // who left, so the channel name must name them too.
+    if (
+      narrowed.length === 1 &&
+      !narrowed[0].overwrite &&
+      !narrowed[0].member &&
+      !namedByChannel(narrowed[0])
+    )
+      throw new ArchiveError(
+        "collection",
+        `서버를 나간 사람의 대화만 남아 있어 지원자인지 리크루터인지 알 수 없습니다. 후보: ${label(narrowed[0])}. ${hint}`,
+      );
+    if (narrowed.length === 1) {
+      const [person] = narrowed;
+      return asApplicant(person, [
+        ...supported(person),
+        ...(namedByChannel(person) ? (["channel_name"] as const) : []),
+      ]);
+    }
+    throw new ArchiveError(
+      "collection",
+      `지원자를 한 명으로 정할 수 없습니다. 후보 ${narrowed.length}명: ${listed(narrowed.map(label))}. ${hint}`,
+    );
+  }
+  // Nobody but recruiters: an applicant who has since become one, if the channel was created for them.
+  const named = recruiters.filter(namedByChannel);
+  if (named.length === 1)
+    return asApplicant(named[0], [...supported(named[0]), "channel_name"]);
+  const recruiterList = recruiters.map((person) =>
+    describe(person, ["리크루터"]),
+  );
+  const why = [...recruiterList, ...excluded];
+  throw new ArchiveError(
+    "collection",
+    `지원자를 찾지 못했습니다. 리크루터·봇·명령자가 아닌 개인 권한 대상도, 대화한 사람도 없습니다.${why.length ? ` 제외: ${listed(why)}.` : ""} ${hint}`,
+  );
 }
 
 export interface CollectOptions {
@@ -472,7 +681,12 @@ export async function collectConsultation(
   const state = (
     interaction.client as any
   ).recruitStateMachine?.getCurrentState(channel.id);
-  const applicant = await resolveApplicant(interaction, channel, state);
+  const applicant = await resolveApplicant(
+    interaction,
+    channel,
+    state,
+    messages,
+  );
   let recruitmentType: RecruitmentType = channel.name.endsWith("-daehwa")
     ? "other"
     : "unknown";
@@ -578,7 +792,9 @@ export async function collectConsultation(
     channel_name: channel.name,
     recruitment_type: recruitmentType,
     applicant_discord_id: applicant.id,
-    applicant_display_name: applicant.displayName,
+    applicant_display_name: applicant.inGuild
+      ? applicant.displayName
+      : `${applicant.displayName} (서버 나감)`,
     completed_by_discord_id: interaction.user.id,
     completed_by_display_name:
       interaction.member && "displayName" in interaction.member
@@ -612,6 +828,7 @@ export async function collectConsultation(
       source: "recruit-bot",
       cutoff_captured_before_fetch: cutoff.id,
       omitted_assets: omitted,
+      applicant: { in_guild: applicant.inGuild, evidence: applicant.evidence },
     },
     participants: [...participantMap.values()],
     messages: serializedMessages,

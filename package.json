@@ -1,6 +1,6 @@
 {
   "name": "auth-bot-docker",
-  "version": "4.0.2",
+  "version": "4.0.3",
   "description": "NIS / recruit Discord bot: SeAT roles, recruiting and verified consultation archive",
   "main": "index.js",
   "scripts": {
